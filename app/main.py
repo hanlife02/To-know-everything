@@ -46,12 +46,13 @@ def create_app() -> FastAPI:
         feed_kinds: list[FeedKind] | None = Query(default=None),
         categories: list[str] | None = Query(default=None),
         limit: int = Query(default=settings.default_limit, ge=1, le=30),
+        recent_hours: int | None = Query(default=settings.default_recent_hours, ge=1, le=168),
         app_settings: Settings = Depends(get_settings),
     ) -> AggregatedResponse:
         selected_platforms = platforms or list(Platform)
         selected_feed_kinds = feed_kinds or list(FeedKind)
         aggregator: AggregatorService = (request.app.state.aggregator if request else AggregatorService(app_settings))
-        response = await aggregator.fetch(selected_platforms, selected_feed_kinds, limit)
+        response = await aggregator.fetch(selected_platforms, selected_feed_kinds, limit, recent_hours=recent_hours)
         if categories:
             response.items = [item for item in response.items if item.category in categories]
             response.total = len(response.items)

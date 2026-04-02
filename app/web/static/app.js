@@ -5,6 +5,7 @@ const errorPanel = document.getElementById("error-panel");
 const apiKeyInput = document.getElementById("api-key");
 const categoryFilter = document.getElementById("category-filter");
 const limitInput = document.getElementById("limit");
+const recentHoursInput = document.getElementById("recent-hours");
 const refreshButton = document.getElementById("refresh");
 
 const storageKey = "social-pulse-board-api-key";
@@ -47,6 +48,10 @@ function renderItems(items) {
       const cover = item.cover_url
         ? `<img class="item-cover" src="${escapeHtml(item.cover_url)}" alt="${escapeHtml(item.title)}" loading="lazy" referrerpolicy="no-referrer" />`
         : `<div class="item-cover"></div>`;
+      const publishedText = formatPublishedAt(item.published_at);
+      const recencyBadge = item.metadata?.recency_state === "unknown"
+        ? '<span class="badge">time-unknown</span>'
+        : "";
 
       return `
         <article class="item-card">
@@ -57,6 +62,7 @@ function renderItems(items) {
             <span class="badge accent">${escapeHtml(item.platform)}</span>
             <span class="badge">${escapeHtml(item.feed_kind)}</span>
             <span class="badge">${escapeHtml(item.category)}</span>
+            ${recencyBadge}
           </div>
           <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">
             <h2 class="item-title">${escapeHtml(item.title)}</h2>
@@ -66,6 +72,7 @@ function renderItems(items) {
             <span>${escapeHtml(item.author || "未知来源")}</span>
             <span>${escapeHtml(item.source_category || item.content_type)}</span>
             <span>${escapeHtml(item.popularity_text || "无热度字段")}</span>
+            <span>${escapeHtml(publishedText)}</span>
           </div>
           <div class="tags">${tags}</div>
           <a class="item-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">查看原文</a>
@@ -106,6 +113,7 @@ async function loadContent() {
     params.append("categories", categoryFilter.value);
   }
   params.append("limit", limitInput.value || "12");
+  params.append("recent_hours", recentHoursInput.value || "24");
 
   try {
     const response = await fetch(`/api/content?${params.toString()}`, {
@@ -120,11 +128,15 @@ async function loadContent() {
     }
 
     const payload = await response.json();
+    const selectedFeedKinds = collectValues("feed-kind");
+    const hotOnly = selectedFeedKinds.length === 1 && selectedFeedKinds[0] === "hot";
     updateCategories(payload.categories || [], categoryFilter.value);
     renderItems(payload.items || []);
     renderErrors(payload.errors || []);
     statusNode.textContent = `已拉取 ${payload.total} 条内容`;
-    metaNode.textContent = `更新时间 ${new Date(payload.fetched_at).toLocaleString()}`;
+    metaNode.textContent = hotOnly
+      ? `更新时间 ${new Date(payload.fetched_at).toLocaleString()} · 优先近 ${recentHoursInput.value} 小时热门，数量不足时补充时间未知的热门内容`
+      : `更新时间 ${new Date(payload.fetched_at).toLocaleString()} · 仅保留近 ${recentHoursInput.value} 小时内容`;
   } catch (error) {
     renderItems([]);
     renderErrors([]);
@@ -133,6 +145,17 @@ async function loadContent() {
   } finally {
     refreshButton.disabled = false;
   }
+}
+
+function formatPublishedAt(value) {
+  if (!value) {
+    return "发布时间未知";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "发布时间未知";
+  }
+  return `发布时间 ${date.toLocaleString()}`;
 }
 
 function escapeHtml(value) {

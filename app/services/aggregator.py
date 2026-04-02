@@ -23,12 +23,27 @@ class AggregatorService:
         self.settings = settings
         self._cache: dict[str, CacheEntry] = {}
 
-    def _cache_key(self, platforms: list[Platform], feed_kinds: list[FeedKind], limit: int) -> str:
+    def _item_recency_state(self, item: ContentItem, now: datetime, recent_hours: int | None) -> str:
+        if recent_hours is None:
+            return "recent"
+        if item.published_at is None:
+            return "unknown"
+        cutoff = now - timedelta(hours=recent_hours)
+        return "recent" if item.published_at >= cutoff else "stale"
+
+    def _cache_key(
+        self,
+        platforms: list[Platform],
+        feed_kinds: list[FeedKind],
+        limit: int,
+        recent_hours: int | None,
+    ) -> str:
         return ":".join(
             [
                 ",".join(sorted(platform.value for platform in platforms)),
                 ",".join(sorted(feed.value for feed in feed_kinds)),
                 str(limit),
+                str(recent_hours),
             ]
         )
 
@@ -37,8 +52,9 @@ class AggregatorService:
         platforms: list[Platform],
         feed_kinds: list[FeedKind],
         limit: int,
+        recent_hours: int | None = None,
     ) -> AggregatedResponse:
-        cache_key = self._cache_key(platforms, feed_kinds, limit)
+        cache_key = self._cache_key(platforms, feed_kinds, limit, recent_hours)
         now = datetime.now(tz=UTC)
         cached = self._cache.get(cache_key)
         if cached and cached.expires_at > now:
@@ -64,16 +80,26 @@ class AggregatorService:
             raw_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         items: list[ContentItem] = []
+        fallback_items: list[ContentItem] = []
         errors: list[FetchError] = []
+        target_total = len(platforms) * len(feed_kinds) * limit
 
         for (platform, feed_kind), result in zip(task_meta, raw_results, strict=True):
             if isinstance(result, Exception):
                 errors.append(FetchError(platform=platform, feed_kind=feed_kind, message=str(result)))
                 continue
             for item in result:
+                effective_recent_hours = recent_hours
+                if effective_recent_hours is None and item.feed_kind == FeedKind.HOT:
+                    effective_recent_hours = self.settings.hot_window_hours
                 if not item.category or item.category == "general":
                     item.category = infer_category(item.title, item.tags, item.source_category)
-                items.append(item)
+                recency_state = self._item_recency_state(item, now, effective_recent_hours)
+                item.metadata["recency_state"] = recency_state
+                if recency_state == "recent":
+                    items.append(item)
+                elif recency_state == "unknown" and item.feed_kind == FeedKind.HOT:
+                    fallback_items.append(item)
 
         items.sort(
             key=lambda item: (
@@ -83,6 +109,16 @@ class AggregatorService:
             ),
             reverse=True,
         )
+        fallback_items.sort(
+            key=lambda item: (
+                item.popularity_score or 0,
+                item.platform.value,
+                item.title,
+            ),
+            reverse=True,
+        )
+        if len(items) < target_total and fallback_items:
+            items.extend(fallback_items[: target_total - len(items)])
 
         response = AggregatedResponse(
             fetched_at=now,
@@ -98,4 +134,3 @@ class AggregatorService:
             payload=response,
         )
         return response
-

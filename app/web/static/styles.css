@@ -95,7 +95,7 @@ body {
 
 .control-row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 140px 140px;
+  grid-template-columns: minmax(0, 2fr) 140px 160px 140px;
   gap: 14px;
 }
 
@@ -315,4 +315,3 @@ button.primary {
     flex-direction: column;
   }
 }
-

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     request_timeout: float = Field(default=15.0, alias="REQUEST_TIMEOUT")
     default_limit: int = Field(default=12, alias="DEFAULT_LIMIT")
     cache_ttl_seconds: int = Field(default=120, alias="CACHE_TTL_SECONDS")
+    default_recent_hours: int = Field(default=24, alias="DEFAULT_RECENT_HOURS")
+    hot_window_hours: int = Field(default=24, alias="HOT_WINDOW_HOURS")
     bilibili_cookie: str | None = Field(default=None, alias="BILIBILI_COOKIE")
     weibo_cookie: str | None = Field(default=None, alias="WEIBO_COOKIE")
     zhihu_cookie: str | None = Field(default=None, alias="ZHIHU_COOKIE")
@@ -37,4 +39,3 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-
