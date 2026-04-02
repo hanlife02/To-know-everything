@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>内容摘要看板</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">Content Digest Dashboard</p>
+        <h1>Bilibili + 小红书统一摘要</h1>
+        <p class="subtitle">一个页面统一查看 Bilibili 热门内容和小红书推荐笔记，只保留可快速判断价值的核心信息。</p>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <section class="flash-list">
+        {% for category, message in messages %}
+        <article class="flash flash-{{ category }}">{{ message }}</article>
+        {% endfor %}
+      </section>
+      {% endif %}
+      {% endwith %}
+
+      <section class="settings-panel">
+        <div class="panel-head">
+          <div>
+            <p class="platform-name">Notifications</p>
+            <h2>推送设置</h2>
+          </div>
+          <div class="panel-links">
+            <a href="{{ url_for('notification_settings_api') }}" target="_blank" rel="noreferrer">配置 JSON</a>
+            <a href="{{ url_for('all_api') }}" target="_blank" rel="noreferrer">全部内容 JSON</a>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <form class="settings-form" action="{{ url_for('save_notifications') }}" method="post">
+            <label>
+              <span>Bark Key</span>
+              <input type="password" name="bark_key" value="{{ notification_settings.bark_key }}" placeholder="填写 Bark device key">
+            </label>
+            <label>
+              <span>Telegram Bot Token</span>
+              <input type="password" name="telegram_bot_token" value="{{ notification_settings.telegram_bot_token }}" placeholder="填写 Telegram bot token">
+            </label>
+            <label>
+              <span>Telegram Chat ID</span>
+              <input type="text" name="telegram_chat_id" value="{{ notification_settings.telegram_chat_id }}" placeholder="填写 Telegram chat id">
+            </label>
+            <button type="submit" class="primary-button">保存配置</button>
+          </form>
+
+          <div class="settings-side">
+            <div class="status-list">
+              <p>Bark：{{ "已配置" if notification_status.bark_configured else "未配置" }}{% if notification_status.masked_bark_key %}（{{ notification_status.masked_bark_key }}）{% endif %}</p>
+              <p>Telegram：{{ "已配置" if notification_status.telegram_configured else "未配置" }}{% if notification_status.masked_telegram_bot_token %}（{{ notification_status.masked_telegram_bot_token }} / {{ notification_status.masked_telegram_chat_id }}）{% endif %}</p>
+            </div>
+
+            <div class="action-group">
+              <form action="{{ url_for('notify_test') }}" method="post">
+                <input type="hidden" name="channel" value="bark">
+                <button type="submit">测试 Bark</button>
+              </form>
+              <form action="{{ url_for('notify_test') }}" method="post">
+                <input type="hidden" name="channel" value="telegram">
+                <button type="submit">测试 Telegram</button>
+              </form>
+              <form action="{{ url_for('notify_test') }}" method="post">
+                <input type="hidden" name="channel" value="all">
+                <button type="submit">测试全部通知</button>
+              </form>
+            </div>
+
+            <div class="action-group">
+              <form action="{{ url_for('notify_send') }}" method="post">
+                <input type="hidden" name="channel" value="all">
+                <input type="hidden" name="target" value="bilibili">
+                <button type="submit">推送 Bilibili 摘要</button>
+              </form>
+              <form action="{{ url_for('notify_send') }}" method="post">
+                <input type="hidden" name="channel" value="all">
+                <input type="hidden" name="target" value="xhs">
+                <button type="submit">推送小红书摘要</button>
+              </form>
+              <form action="{{ url_for('notify_send') }}" method="post">
+                <input type="hidden" name="channel" value="all">
+                <input type="hidden" name="target" value="all">
+                <button type="submit" class="primary-button">推送统一摘要</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="platform-grid">
+        <section class="platform-panel">
+          <div class="panel-head">
+            <div>
+              <p class="platform-name">Bilibili</p>
+              <h2>热门内容摘要</h2>
+            </div>
+            <div class="panel-links">
+              <a href="{{ url_for('bilibili_api') }}" target="_blank" rel="noreferrer">JSON</a>
+            </div>
+          </div>
+          <p class="overview">{{ bilibili.overview }}</p>
+          <p class="meta">更新时间：{{ bilibili.updated_at }}</p>
+          {% if bilibili.error %}
+          <p class="notice">{{ bilibili.error }}</p>
+          {% endif %}
+          <div class="summary-list">
+            {% for video in bilibili.videos %}
+            <article class="summary-item">
+              <div class="summary-head">
+                <span class="rank">#{{ video.rank }}</span>
+                <h3>{{ video.title }}</h3>
+              </div>
+              <p class="summary-text">{{ video.summary }}</p>
+              {% if video.url %}
+              <p class="summary-link">
+                视频链接：
+                <a href="{{ video.url }}" target="_blank" rel="noreferrer">{{ video.url }}</a>
+              </p>
+              {% endif %}
+            </article>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="platform-panel">
+          <div class="panel-head">
+            <div>
+              <p class="platform-name">Xiaohongshu</p>
+              <h2>推荐笔记摘要</h2>
+            </div>
+            <div class="panel-links">
+              <a href="{{ url_for('xhs_api') }}" target="_blank" rel="noreferrer">JSON</a>
+            </div>
+          </div>
+          <p class="overview">{{ xhs.overview }}</p>
+          <p class="meta">更新时间：{{ xhs.updated_at }}</p>
+          {% if xhs.error %}
+          <p class="notice">{{ xhs.error }}</p>
+          {% endif %}
+          <div class="summary-list">
+            {% for note in xhs.notes %}
+            <article class="summary-item">
+              <div class="summary-head">
+                <span class="rank">#{{ note.rank }}</span>
+                <h3>{{ note.title }}</h3>
+              </div>
+              <p class="summary-text">{{ note.summary }}</p>
+              {% if note.url %}
+              <p class="summary-link">
+                笔记链接：
+                <a href="{{ note.url }}" target="_blank" rel="noreferrer">{{ note.url }}</a>
+              </p>
+              {% endif %}
+            </article>
+            {% endfor %}
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

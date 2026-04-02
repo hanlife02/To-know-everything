@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>小红书推荐摘要</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">Xiaohongshu Digest</p>
+        <h1>推荐笔记摘要</h1>
+        <p class="subtitle">只保留标题、作者、点赞和笔记链接这些关键内容，避免被原始 HTML 和样式噪音干扰。</p>
+      </section>
+
+      <section class="panel overview">
+        <div>
+          <p class="panel-label">总览摘要</p>
+          <p class="overview-text">{{ overview }}</p>
+        </div>
+        <div class="hero-meta">
+          <p>更新时间</p>
+          <strong>{{ updated_at }}</strong>
+          <a href="{{ url_for('notes_api') }}" target="_blank" rel="noreferrer">查看 JSON</a>
+        </div>
+      </section>
+
+      {% if error %}
+      <section class="notice">
+        {{ error }}
+      </section>
+      {% endif %}
+
+      <section class="summary-list">
+        {% for note in notes %}
+        <article class="summary-item">
+          <div class="summary-head">
+            <span class="rank">#{{ note.rank }}</span>
+            <h2>{{ note.title }}</h2>
+          </div>
+          <p class="summary-text">{{ note.summary }}</p>
+          {% if note.url %}
+          <p class="summary-link">
+            笔记链接：
+            <a href="{{ note.url }}" target="_blank" rel="noreferrer">{{ note.url }}</a>
+          </p>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </section>
+    </main>
+  </body>
+</html>
