@@ -1,0 +1,16 @@
+[project]
+name = "social-pulse-board"
+version = "0.1.0"
+description = "A modular Python aggregator for hot and latest content across Chinese social platforms."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0,<1.0.0",
+  "httpx>=0.27.0,<1.0.0",
+  "jinja2>=3.1.0,<4.0.0",
+  "pydantic-settings>=2.3.0,<3.0.0",
+  "selectolax>=0.3.21,<1.0.0",
+  "uvicorn[standard]>=0.30.0,<1.0.0",
+]
+
+[tool.uv]
+package = false

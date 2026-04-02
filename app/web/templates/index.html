@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}" />
+  </head>
+  <body>
+    <div class="ambient ambient-left"></div>
+    <div class="ambient ambient-right"></div>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Cross-platform signal board</p>
+        <h1>{{ app_name }}</h1>
+        <p class="hero-copy">
+          把 Bilibili、微博、知乎、小红书的热门和最新内容放到一个统一页面里，支持鉴权、分类和平台筛选。
+        </p>
+      </section>
+
+      <section class="controls card">
+        <div class="control-row">
+          <label class="field field-wide">
+            <span>API Key</span>
+            <input id="api-key" type="password" placeholder="输入 .env 里的 API_KEY" />
+          </label>
+          <label class="field">
+            <span>每类条数</span>
+            <input id="limit" type="number" min="1" max="30" value="{{ default_limit }}" />
+          </label>
+          <button id="refresh" class="primary">刷新内容</button>
+        </div>
+
+        <div class="filters">
+          <div class="filter-group">
+            <span class="filter-label">平台</span>
+            {% for platform in platforms %}
+            <label class="chip">
+              <input type="checkbox" name="platform" value="{{ platform }}" checked />
+              <span>{{ platform }}</span>
+            </label>
+            {% endfor %}
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-label">内容流</span>
+            {% for feed_kind in feed_kinds %}
+            <label class="chip">
+              <input type="checkbox" name="feed-kind" value="{{ feed_kind }}" checked />
+              <span>{{ feed_kind }}</span>
+            </label>
+            {% endfor %}
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-label">分类</span>
+            <select id="category-filter">
+              <option value="">全部分类</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="status-row">
+        <div id="status">等待请求</div>
+        <div id="meta"></div>
+      </section>
+
+      <section id="error-panel" class="error-panel hidden"></section>
+      <section id="grid" class="grid"></section>
+    </main>
+
+    <script src="{{ url_for('static', path='app.js') }}"></script>
+  </body>
+</html>
+
