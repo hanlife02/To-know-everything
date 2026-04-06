@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime
+import json
 
 from flask import Flask, jsonify, render_template
 
 try:
-    from .crawler import build_summary, dump_recommended_notes, fetch_recommended_notes, load_cached_notes
+    from .crawler import (
+        DEFAULT_OUTPUT,
+        build_summary,
+        dump_recommended_notes,
+        fetch_recommended_notes,
+        load_cached_notes,
+    )
 except ImportError:
-    from crawler import build_summary, dump_recommended_notes, fetch_recommended_notes, load_cached_notes
+    from crawler import (
+        DEFAULT_OUTPUT,
+        build_summary,
+        dump_recommended_notes,
+        fetch_recommended_notes,
+        load_cached_notes,
+    )
 
 app = Flask(__name__)
 
@@ -46,17 +58,40 @@ def build_overview(notes: list[dict]) -> str:
     )
 
 
+def load_cached_payload() -> dict:
+    if not DEFAULT_OUTPUT.exists():
+        return {"updated_at": "", "notes": []}
+    payload = json.loads(DEFAULT_OUTPUT.read_text(encoding="utf-8"))
+    return {
+        "updated_at": payload.get("updated_at", ""),
+        "notes": payload.get("notes", []),
+    }
+
+
 def load_page_data() -> dict:
+    payload = load_cached_payload()
+    data = enrich_notes(payload.get("notes", []))
+
+    return {
+        "notes": data,
+        "overview": build_overview(data),
+        "updated_at": payload.get("updated_at") or "暂无缓存",
+        "error": "" if data else "当前没有缓存内容，请先点击“更新 小红书”。",
+    }
+
+
+def refresh_page_data() -> dict:
     error = ""
-    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         notes = fetch_recommended_notes()
         dump_recommended_notes(notes)
         data = [asdict(note) for note in notes]
+        updated_at = load_cached_payload().get("updated_at") or ""
     except Exception as exc:  # noqa: BLE001
-        error = f"实时抓取失败，已尝试回退缓存：{exc}"
+        error = f"更新失败，已回退缓存：{exc}"
         data = load_cached_notes()
+        updated_at = load_cached_payload().get("updated_at") or "暂无缓存"
 
     data = enrich_notes(data)
 

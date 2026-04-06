@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}模型设置 - 内容摘要看板{% endblock %}
+
+{% block content %}
+<section class="page-section">
+  <h1 class="page-title">模型设置</h1>
+
+  <div class="section-block">
+    <h3>模型配置</h3>
+    <form class="settings-form" action="{{ url_for('save_llm') }}" method="post">
+      <label>
+        <span>请求格式</span>
+        <select name="api_format">
+          <option value="openai" {% if llm_settings.api_format == "openai" %}selected{% endif %}>OpenAI 格式</option>
+          <option value="claude" {% if llm_settings.api_format == "claude" %}selected{% endif %}>Claude 格式</option>
+        </select>
+      </label>
+      <label>
+        <span>接口地址</span>
+        <input type="text" name="base_url" value="{{ llm_settings.base_url }}" placeholder="例如 https://api.openai.com 或兼容网关地址">
+      </label>
+      <label>
+        <span>接口密钥</span>
+        <input type="password" name="api_key" value="{{ llm_settings.api_key }}" placeholder="填写模型服务的 API key">
+      </label>
+      <label>
+        <span>当前模型</span>
+        <input type="text" name="model" value="{{ llm_settings.model }}" placeholder="可手动填写，也可先拉取列表再选择">
+      </label>
+      <button type="submit" class="primary-button">保存模型配置</button>
+    </form>
+  </div>
+
+  <div class="section-block">
+    <div class="section-head">
+      <h3>连接状态</h3>
+      <div class="section-links">
+        <a href="{{ url_for('llm_settings_api') }}" target="_blank" rel="noreferrer">模型数据</a>
+      </div>
+    </div>
+    <div class="info-list">
+      <p>请求格式：{{ llm_status.api_format }}</p>
+      <p>接口地址：{{ "已配置" if llm_status.base_url_configured else "未配置" }}</p>
+      <p>接口密钥：{{ "已配置" if llm_status.api_key_configured else "未配置" }}{% if llm_status.masked_api_key %}（{{ llm_status.masked_api_key }}）{% endif %}</p>
+      <p>当前模型：{{ llm_settings.model or "未选择" }}</p>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h3>模型同步</h3>
+    <div class="action-list">
+      <form action="{{ url_for('refresh_llm_models') }}" method="post">
+        <button type="submit">获取模型列表</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h3>可选模型列表</h3>
+    {% if llm_models %}
+    <form class="model-select-form" action="{{ url_for('select_llm_model') }}" method="post">
+      <select name="selected_model">
+        {% for model in llm_models %}
+        <option value="{{ model.id }}" {% if llm_settings.model == model.id %}selected{% endif %}>{{ model.label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="primary-button">选择这个模型</button>
+    </form>
+    {% else %}
+    <p class="empty-state">还没有缓存模型列表，先点击“获取模型列表”。</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

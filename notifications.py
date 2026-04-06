@@ -9,6 +9,7 @@ from typing import Any
 import requests
 
 SETTINGS_PATH = Path(__file__).resolve().parent / "data" / "notification_settings.json"
+TELEGRAM_TEXT_LIMIT = 4000
 
 
 @dataclass(slots=True)
@@ -119,14 +120,30 @@ def send_telegram_notification(
     title: str,
     body: str,
 ) -> str:
+    return send_telegram_text(settings, build_telegram_text(title, body))
+
+
+def build_telegram_text(title: str, body: str) -> str:
+    return f"{title.strip()}\n\n{body.strip()}".strip()
+
+
+def send_telegram_text(
+    settings: NotificationSettings,
+    text: str,
+) -> str:
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         raise ValueError("Telegram bot token or chat id is not configured.")
+
+    if len(text) > TELEGRAM_TEXT_LIMIT:
+        raise ValueError(
+            f"Telegram text is too long ({len(text)} chars), limit is {TELEGRAM_TEXT_LIMIT}."
+        )
 
     response = requests.post(
         f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
         json={
             "chat_id": settings.telegram_chat_id,
-            "text": f"{title}\n\n{body}",
+            "text": text,
             "disable_web_page_preview": False,
         },
         timeout=20,
@@ -142,6 +159,20 @@ def send_telegram_notification(
             f"Telegram push failed: {get_response_error_message(response)}"
         )
     return "Telegram 通知发送成功。"
+
+
+def send_telegram_messages(
+    settings: NotificationSettings,
+    messages: list[tuple[str, str]],
+) -> list[str]:
+    results: list[str] = []
+    for index, (title, body) in enumerate(messages, start=1):
+        try:
+            send_telegram_text(settings, build_telegram_text(title, body))
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"Telegram 第 {index} 条消息发送失败：{exc}") from exc
+        results.append(f"Telegram 第 {index} 条消息发送成功。")
+    return results
 
 
 def send_notification(
@@ -171,6 +202,9 @@ def build_platform_digest(
     item_title_key: str = "title",
     limit: int = 5,
 ) -> tuple[str, str]:
+    if not items:
+        raise ValueError(f"{platform_name} 今天没有可推送的内容。")
+
     lines = [overview.strip()]
     for item in items[:limit]:
         title = item.get(item_title_key, "").strip()
@@ -189,36 +223,35 @@ def build_platform_digest(
 
 def build_combined_digest(
     bilibili: dict[str, Any],
+    materials_notices: dict[str, Any],
     xhs: dict[str, Any],
 ) -> tuple[str, str]:
     title = "内容摘要看板更新"
-    body_parts = [
-        "【Bilibili】",
-        bilibili.get("overview", "").strip(),
-        "",
+    body_parts: list[str] = []
+
+    sections = [
+        ("【Bilibili】", bilibili.get("overview", "").strip(), bilibili.get("videos", [])),
+        (
+            "【材料学院通知】",
+            materials_notices.get("overview", "").strip(),
+            materials_notices.get("notices", []),
+        ),
+        ("【小红书】", xhs.get("overview", "").strip(), xhs.get("notes", [])),
     ]
 
-    for item in bilibili.get("videos", [])[:3]:
-        body_parts.append(f"{item.get('rank', '-')}. {item.get('title', '')}")
-        body_parts.append(item.get("summary", "").strip())
-        if item.get("url"):
-            body_parts.append(f"链接：{item['url']}")
-        body_parts.append("")
+    for section_title, overview, items in sections:
+        if not items:
+            continue
+        body_parts.extend([section_title, overview, ""])
+        for item in items[:3]:
+            body_parts.append(f"{item.get('rank', '-')}. {item.get('title', '')}")
+            body_parts.append(item.get("summary", "").strip())
+            if item.get("url"):
+                body_parts.append(f"链接：{item['url']}")
+            body_parts.append("")
 
-    body_parts.extend(
-        [
-            "【小红书】",
-            xhs.get("overview", "").strip(),
-            "",
-        ]
-    )
-
-    for item in xhs.get("notes", [])[:3]:
-        body_parts.append(f"{item.get('rank', '-')}. {item.get('title', '')}")
-        body_parts.append(item.get("summary", "").strip())
-        if item.get("url"):
-            body_parts.append(f"链接：{item['url']}")
-        body_parts.append("")
+    if not body_parts:
+        raise ValueError("今天没有可推送的内容。")
 
     body = "\n".join(part for part in body_parts if part is not None).strip()
     return title, body

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}调试入口 - 内容摘要看板{% endblock %}
+
+{% block content %}
+<section class="page-section">
+  <h1 class="page-title">调试入口</h1>
+
+  <div class="section-block">
+    <h3>接口入口</h3>
+    <div class="link-list">
+      <a href="{{ url_for('bilibili_api') }}" target="_blank" rel="noreferrer">哔哩哔哩数据</a>
+      <a href="{{ url_for('materials_notices_api') }}" target="_blank" rel="noreferrer">材料学院通知数据</a>
+      <a href="{{ url_for('xhs_api') }}" target="_blank" rel="noreferrer">小红书数据</a>
+      <a href="{{ url_for('all_api') }}" target="_blank" rel="noreferrer">全部内容数据</a>
+      <a href="{{ url_for('ai_daily_reports_api') }}" target="_blank" rel="noreferrer">AI 日报数据</a>
+    </div>
+  </div>
+
+  <div class="section-block">
+    <h3>最新状态</h3>
+    <div class="inline-info">
+      <p><span>哔哩哔哩</span><strong>{{ bilibili.updated_at }}</strong></p>
+      <p><span>材料学院通知</span><strong>{{ materials_notices.updated_at }}</strong></p>
+      <p><span>小红书</span><strong>{{ xhs.updated_at }}</strong></p>
+      <p><span>AI 日报</span><strong>{{ ai_daily_reports.generated_at or "暂无" }}</strong></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}材料学院通知 - 内容摘要看板{% endblock %}
+
+{% block content %}
+<section class="page-section">
+  <div class="section-head">
+    <div>
+      <h1 class="page-title">材料学院通知</h1>
+    </div>
+    <div class="section-actions">
+      <form action="{{ url_for('refresh_materials_notices') }}" method="post">
+        <input type="hidden" name="next" value="{{ url_for('materials_notices_page') }}">
+        <button type="submit" class="primary-button action-button">更新通知</button>
+      </form>
+    </div>
+    <div class="section-links">
+      <a href="{{ url_for('materials_notices_api') }}" target="_blank" rel="noreferrer">数据</a>
+    </div>
+  </div>
+
+  <div class="section-meta">
+    <p class="overview">{{ materials_notices.overview }}</p>
+    <p class="meta">更新时间：{{ materials_notices.updated_at }}</p>
+  </div>
+
+  {% if materials_notices.error %}
+  <p class="notice">{{ materials_notices.error }}</p>
+  {% endif %}
+
+  <div class="summary-list">
+    {% for notice in materials_notices.notices %}
+    <article class="summary-item">
+      <div class="summary-head">
+        <span class="rank">#{{ notice.rank }}</span>
+        <h3 title="{{ notice.title }}">{{ notice.title }}</h3>
+      </div>
+      {% if notice.published_at %}
+      <p class="summary-text">日期：{{ notice.published_at }}</p>
+      {% endif %}
+      {% if notice.url %}
+      <p class="summary-link">
+        原文链接：
+        <a href="{{ notice.url }}" target="_blank" rel="noreferrer">{{ notice.url }}</a>
+      </p>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

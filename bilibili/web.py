@@ -2,14 +2,28 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import asdict
-from datetime import datetime
+import json
 
 from flask import Flask, jsonify, render_template
 
 try:
-    from .crawler import DEFAULT_PAGE, DEFAULT_PAGE_SIZE, dump_hot_videos, fetch_hot_videos, load_cached_hot_videos
+    from .crawler import (
+        DEFAULT_OUTPUT,
+        DEFAULT_PAGE,
+        DEFAULT_PAGE_SIZE,
+        dump_hot_videos,
+        fetch_hot_videos,
+        load_cached_hot_videos,
+    )
 except ImportError:
-    from crawler import DEFAULT_PAGE, DEFAULT_PAGE_SIZE, dump_hot_videos, fetch_hot_videos, load_cached_hot_videos
+    from crawler import (
+        DEFAULT_OUTPUT,
+        DEFAULT_PAGE,
+        DEFAULT_PAGE_SIZE,
+        dump_hot_videos,
+        fetch_hot_videos,
+        load_cached_hot_videos,
+    )
 
 app = Flask(__name__)
 
@@ -83,17 +97,40 @@ def build_overview(videos: list[dict]) -> str:
     )
 
 
+def load_cached_payload() -> dict:
+    if not DEFAULT_OUTPUT.exists():
+        return {"updated_at": "", "videos": []}
+    payload = json.loads(DEFAULT_OUTPUT.read_text(encoding="utf-8"))
+    return {
+        "updated_at": payload.get("updated_at", ""),
+        "videos": payload.get("videos", []),
+    }
+
+
 def load_page_data() -> dict:
+    payload = load_cached_payload()
+    data = enrich_videos(payload.get("videos", []))
+
+    return {
+        "videos": data,
+        "overview": build_overview(data),
+        "updated_at": payload.get("updated_at") or "暂无缓存",
+        "error": "" if data else "当前没有缓存内容，请先点击“更新 Bilibili”。",
+    }
+
+
+def refresh_page_data() -> dict:
     error = ""
-    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         videos = fetch_hot_videos(page_size=DEFAULT_PAGE_SIZE, page=DEFAULT_PAGE)
         dump_hot_videos(videos, page_size=DEFAULT_PAGE_SIZE, page=DEFAULT_PAGE)
         data = [asdict(video) for video in videos]
+        updated_at = load_cached_payload().get("updated_at") or ""
     except Exception as exc:  # noqa: BLE001
-        error = f"实时抓取失败，已尝试回退缓存：{exc}"
+        error = f"更新失败，已回退缓存：{exc}"
         data = load_cached_hot_videos()
+        updated_at = load_cached_payload().get("updated_at") or "暂无缓存"
 
     data = enrich_videos(data)
 

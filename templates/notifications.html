@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}推送设置 - 内容摘要看板{% endblock %}
+
+{% block content %}
+<section class="page-section">
+  <h1 class="page-title">推送设置</h1>
+
+  <div class="control-hero">
+    <div class="section-head">
+      <div>
+        <h3>程序控制</h3>
+      </div>
+      <div class="section-links">
+        <a href="{{ url_for('program_status_api') }}" target="_blank" rel="noreferrer">程序状态数据</a>
+      </div>
+    </div>
+
+    <div class="metric-grid">
+      <article class="metric-card">
+        <span class="metric-label">调度线程</span>
+        <strong class="metric-value">{{ "运行中" if scheduler_running else "未启动" }}</strong>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">哔哩哔哩缓存</span>
+        <strong class="metric-value">{{ bilibili.videos|length }} 条</strong>
+        <span class="metric-meta">{{ bilibili.updated_at }}</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">材料学院通知缓存</span>
+        <strong class="metric-value">{{ materials_notices.notices|length }} 条</strong>
+        <span class="metric-meta">{{ materials_notices.updated_at }}</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">小红书缓存</span>
+        <strong class="metric-value">{{ xhs.notes|length }} 条</strong>
+        <span class="metric-meta">{{ xhs.updated_at }}</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">AI 日报缓存</span>
+        <strong class="metric-value">{{ ai_daily_reports.count }} 份</strong>
+        <span class="metric-meta">{{ ai_daily_reports.generated_at or "暂无" }}</span>
+      </article>
+    </div>
+
+    <div class="action-grid">
+      <form action="{{ url_for('refresh_all_dashboard') }}" method="post">
+        <button type="submit">刷新全部内容</button>
+      </form>
+      <form action="{{ url_for('run_pipeline_now') }}" method="post">
+        <button type="submit" class="primary-button">执行标准完整流程</button>
+      </form>
+      <form action="{{ url_for('run_automation_now') }}" method="post">
+        <button type="submit">按自动化配置执行一次</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="stack-column">
+      <article class="panel-card">
+        <div class="section-head">
+          <div>
+            <h3>通知配置</h3>
+          </div>
+        </div>
+        <form class="settings-form" action="{{ url_for('save_notifications') }}" method="post">
+          <label>
+            <span>Bark 密钥</span>
+            <input type="password" name="bark_key" value="{{ notification_settings.bark_key }}" placeholder="填写 Bark device key">
+          </label>
+          <label>
+            <span>Telegram 机器人令牌</span>
+            <input type="password" name="telegram_bot_token" value="{{ notification_settings.telegram_bot_token }}" placeholder="填写 Telegram bot token">
+          </label>
+          <label>
+            <span>Telegram 会话 ID</span>
+            <input type="text" name="telegram_chat_id" value="{{ notification_settings.telegram_chat_id }}" placeholder="填写 Telegram chat id">
+          </label>
+          <button type="submit" class="primary-button">保存配置</button>
+        </form>
+      </article>
+
+      <article class="panel-card panel-card-accent">
+        <div class="section-head">
+          <div>
+            <h3>程序内自动化</h3>
+          </div>
+          <div class="section-links">
+            <span class="status-pill {% if automation_status.enabled %}status-pill-active{% endif %}">{{ "已启用" if automation_status.enabled else "已关闭" }}</span>
+          </div>
+        </div>
+
+        <form class="settings-form automation-form" action="{{ url_for('save_automation') }}" method="post">
+          <div class="setting-row setting-row-strong">
+            <div class="setting-copy">
+              <span class="setting-label">自动执行</span>
+              <span class="setting-hint">每天按设定时间运行</span>
+            </div>
+            <label class="switch" aria-label="启用程序内自动化">
+              <input type="checkbox" name="enabled" value="true" {% if automation_settings.enabled %}checked{% endif %}>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="inline-form-grid automation-grid">
+            <label>
+              <span>执行小时</span>
+              <input type="number" name="hour" min="0" max="23" value="{{ automation_settings.hour }}">
+            </label>
+            <label>
+              <span>执行分钟</span>
+              <input type="number" name="minute" min="0" max="59" value="{{ automation_settings.minute }}">
+            </label>
+          </div>
+
+          <div class="setting-row-group">
+            <div class="setting-row">
+              <div class="setting-copy">
+                <span class="setting-label">顺带推送摘要</span>
+                <span class="setting-hint">执行日报时一并发送摘要</span>
+              </div>
+              <label class="switch" aria-label="执行日报时顺带推送摘要">
+                <input type="checkbox" name="push_summary_too" value="true" {% if automation_settings.push_summary_too %}checked{% endif %}>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-copy">
+                <span class="setting-label">完成提醒</span>
+                <span class="setting-hint">日报推送后发送 Bark 提醒</span>
+              </div>
+              <label class="switch" aria-label="日报推送完成后发送 Bark 完成通知">
+                <input type="checkbox" name="bark_completion" value="true" {% if automation_settings.bark_completion %}checked{% endif %}>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="inline-form-grid automation-grid">
+            <label>
+              <span>摘要目标</span>
+              <select name="summary_target">
+                <option value="all" {% if automation_settings.summary_target == "all" %}selected{% endif %}>统一摘要</option>
+                <option value="bilibili" {% if automation_settings.summary_target == "bilibili" %}selected{% endif %}>哔哩哔哩</option>
+                <option value="materials_notices" {% if automation_settings.summary_target == "materials_notices" %}selected{% endif %}>材料学院通知</option>
+                <option value="xhs" {% if automation_settings.summary_target == "xhs" %}selected{% endif %}>小红书</option>
+              </select>
+            </label>
+            <label>
+              <span>摘要渠道</span>
+              <select name="summary_channel">
+                <option value="all" {% if automation_settings.summary_channel == "all" %}selected{% endif %}>全部</option>
+                <option value="telegram" {% if automation_settings.summary_channel == "telegram" %}selected{% endif %}>Telegram</option>
+                <option value="bark" {% if automation_settings.summary_channel == "bark" %}selected{% endif %}>Bark</option>
+              </select>
+            </label>
+          </div>
+
+          <button type="submit" class="primary-button">保存自动化配置</button>
+        </form>
+      </article>
+    </div>
+
+    <div class="stack-column">
+      <article class="panel-card">
+        <div class="section-head">
+          <div>
+            <h3>当前状态</h3>
+          </div>
+          <div class="section-links">
+            <a href="{{ url_for('notification_settings_api') }}" target="_blank" rel="noreferrer">配置数据</a>
+            <a href="{{ url_for('automation_settings_api') }}" target="_blank" rel="noreferrer">自动化数据</a>
+          </div>
+        </div>
+        <div class="info-list">
+          <p>Bark：{{ "已配置" if notification_status.bark_configured else "未配置" }}{% if notification_status.masked_bark_key %}（{{ notification_status.masked_bark_key }}）{% endif %}</p>
+          <p>Telegram：{{ "已配置" if notification_status.telegram_configured else "未配置" }}{% if notification_status.masked_telegram_bot_token %}（{{ notification_status.masked_telegram_bot_token }} / {{ notification_status.masked_telegram_chat_id }}）{% endif %}</p>
+          <p>自动执行时间：{{ automation_status.schedule }}</p>
+          <p>最近尝试：{{ automation_status.last_attempt_at }}</p>
+          <p>最近成功：{{ automation_status.last_success_at }}</p>
+          <p>最近状态：{{ automation_status.last_status }}</p>
+          <p>最近错误：{{ automation_status.last_error or "无" }}</p>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="section-head">
+          <div>
+            <h3>通知测试</h3>
+          </div>
+        </div>
+        <div class="action-grid">
+          <form action="{{ url_for('notify_test') }}" method="post">
+            <button type="submit" name="channel" value="bark">测试 Bark</button>
+          </form>
+          <form action="{{ url_for('notify_test') }}" method="post">
+            <button type="submit" name="channel" value="telegram">测试 Telegram</button>
+          </form>
+          <form action="{{ url_for('notify_test') }}" method="post">
+            <button type="submit" name="channel" value="all">测试全部通知</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="section-head">
+          <div>
+            <h3>摘要推送</h3>
+          </div>
+        </div>
+        <div class="action-grid">
+          <form action="{{ url_for('notify_send') }}" method="post">
+            <input type="hidden" name="channel" value="all">
+            <input type="hidden" name="target" value="bilibili">
+            <button type="submit">推送哔哩哔哩摘要</button>
+          </form>
+          <form action="{{ url_for('notify_send') }}" method="post">
+            <input type="hidden" name="channel" value="all">
+            <input type="hidden" name="target" value="materials_notices">
+            <button type="submit">推送材料学院通知摘要</button>
+          </form>
+          <form action="{{ url_for('notify_send') }}" method="post">
+            <input type="hidden" name="channel" value="all">
+            <input type="hidden" name="target" value="xhs">
+            <button type="submit">推送小红书摘要</button>
+          </form>
+          <form action="{{ url_for('notify_send') }}" method="post">
+            <input type="hidden" name="channel" value="all">
+            <input type="hidden" name="target" value="all">
+            <button type="submit" class="primary-button">推送统一摘要</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="section-head">
+          <div>
+            <h3>AI 日报</h3>
+          </div>
+          <div class="section-links">
+            <a href="{{ url_for('ai_daily_reports_api') }}" target="_blank" rel="noreferrer">日报数据</a>
+          </div>
+        </div>
+        <div class="action-grid two-columns">
+          <form action="{{ url_for('generate_ai_daily_report') }}" method="post">
+            <button type="submit" class="primary-button">生成 AI 日报</button>
+          </form>
+          <form action="{{ url_for('push_ai_daily_report') }}" method="post">
+            <button type="submit">推送 AI 日报</button>
+          </form>
+        </div>
+        <div class="info-list compact-list">
+          <p>AI 日报缓存：{{ "已生成" if ai_daily_reports.available else "未生成" }}</p>
+          <p>最近生成时间：{{ ai_daily_reports.generated_at or "暂无" }}</p>
+          <p>缓存日报数量：{{ ai_daily_reports.count }}</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+{% endblock %}
