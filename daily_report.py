@@ -6,7 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from content_filters import filter_dashboard_for_today
+from content_filters import filter_dashboard_for_reports
+from delivery_state import build_xhs_signature
 from llm import LLMSettings, generate_text
 
 REPORTS_PATH = Path(__file__).resolve().parent / "data" / "ai_daily_reports.json"
@@ -30,6 +31,7 @@ class DailyReport:
     title: str
     body: str
     generated_at: str
+    content_signature: str = ""
 
 
 def truncate_text(value: str, limit: int = 180) -> str:
@@ -175,7 +177,7 @@ def build_ai_daily_reports(
     settings: LLMSettings,
     dashboard: dict[str, Any],
 ) -> list[DailyReport]:
-    daily_dashboard = filter_dashboard_for_today(dashboard)
+    daily_dashboard = filter_dashboard_for_reports(dashboard)
     bilibili = daily_dashboard["bilibili"]
     materials_notices = daily_dashboard["materials_notices"]
     xhs = daily_dashboard["xhs"]
@@ -199,16 +201,18 @@ def build_ai_daily_reports(
             items=build_materials_notice_items(materials_notices.get("notices", [])),
         ))
     if xhs.get("notes"):
-        reports.append(generate_platform_daily_report(
+        report = generate_platform_daily_report(
             settings,
             platform_name="小红书",
             updated_at=str(xhs.get("updated_at", "")).strip(),
             overview=str(xhs.get("overview", "")).strip(),
             items=build_xhs_items(xhs.get("notes", [])),
-        ))
+        )
+        report.content_signature = build_xhs_signature(xhs.get("notes", []))
+        reports.append(report)
 
     if not reports:
-        raise ValueError("今天没有可用于生成日报的内容。")
+        raise ValueError("当前没有满足条件的内容可用于生成日报。")
 
     return reports
 

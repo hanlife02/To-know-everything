@@ -6,13 +6,14 @@ from typing import Any
 
 from bilibili.web import load_page_data as load_bilibili_page_data
 from bilibili.web import refresh_page_data as refresh_bilibili_page_data
-from content_filters import filter_dashboard_for_today, get_today, parse_item_date
+from content_filters import filter_dashboard_for_summary, get_today, parse_item_date
 from daily_report import (
     build_ai_daily_report_messages,
     build_ai_daily_reports,
     load_cached_ai_daily_reports,
     save_ai_daily_reports,
 )
+from delivery_state import set_delivery_signature
 from llm import load_llm_settings
 from notifications import (
     build_combined_digest,
@@ -79,27 +80,39 @@ def load_cached_dashboard_data() -> dict[str, Any]:
     return dashboard
 
 
-def build_summary_payload(target: str, dashboard: dict[str, Any]) -> tuple[str, str]:
-    daily_dashboard = filter_dashboard_for_today(dashboard)
+def build_summary_payload(
+    target: str,
+    dashboard: dict[str, Any],
+) -> tuple[str, str, dict[str, str]]:
+    filtered_dashboard = filter_dashboard_for_summary(dashboard)
+    state_updates: dict[str, str] = {}
 
     if target == "bilibili":
-        bilibili = daily_dashboard["bilibili"]
-        return build_platform_digest("Bilibili", bilibili["overview"], bilibili["videos"])
+        bilibili = filtered_dashboard["bilibili"]
+        return (*build_platform_digest("Bilibili", bilibili["overview"], bilibili["videos"]), state_updates)
     if target == "materials_notices":
-        materials_notices = daily_dashboard["materials_notices"]
-        return build_platform_digest(
+        materials_notices = filtered_dashboard["materials_notices"]
+        return (*build_platform_digest(
             "材料学院通知",
             materials_notices["overview"],
             materials_notices["notices"],
-        )
+        ), state_updates)
     if target == "xhs":
-        xhs = daily_dashboard["xhs"]
-        return build_platform_digest("小红书", xhs["overview"], xhs["notes"])
+        xhs = filtered_dashboard["xhs"]
+        if xhs.get("notes") and xhs.get("content_signature"):
+            state_updates["xhs"] = str(xhs["content_signature"]).strip()
+        return (*build_platform_digest("小红书", xhs["overview"], xhs["notes"]), state_updates)
     if target == "all":
-        return build_combined_digest(
-            daily_dashboard["bilibili"],
-            daily_dashboard["materials_notices"],
-            daily_dashboard["xhs"],
+        xhs = filtered_dashboard["xhs"]
+        if xhs.get("notes") and xhs.get("content_signature"):
+            state_updates["xhs"] = str(xhs["content_signature"]).strip()
+        return (
+            *build_combined_digest(
+                filtered_dashboard["bilibili"],
+                filtered_dashboard["materials_notices"],
+                filtered_dashboard["xhs"],
+            ),
+            state_updates,
         )
     raise ValueError(f"Unsupported summary target: {target}")
 
@@ -118,6 +131,7 @@ def generate_reports(dashboard: dict[str, Any]) -> list[dict[str, Any]]:
             "title": report.title,
             "body": report.body,
             "generated_at": report.generated_at,
+            "content_signature": report.content_signature,
         }
         for report in reports
     ]
@@ -125,8 +139,11 @@ def generate_reports(dashboard: dict[str, Any]) -> list[dict[str, Any]]:
 
 def push_summary(channel: str, target: str, dashboard: dict[str, Any]) -> None:
     settings = load_notification_settings()
-    title, body = build_summary_payload(target, dashboard)
+    title, body, state_updates = build_summary_payload(target, dashboard)
     results = send_notification(settings, channel, title, body)
+    for platform, signature in state_updates.items():
+        if signature:
+            set_delivery_signature("summary", platform, signature)
     for result in results:
         log(result)
 
@@ -150,14 +167,20 @@ def push_reports(
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         raise ValueError("Telegram bot token 或 chat id 未配置。")
 
-    messages = (
-        build_ai_daily_report_messages(reports)
-        if reports is not None
-        else load_cached_report_messages()
-    )
+    cached_reports = None
+    if reports is not None:
+        messages = build_ai_daily_report_messages(reports)
+    else:
+        cache = load_cached_ai_daily_reports()
+        cached_reports = cache.get("reports", [])
+        messages = load_cached_report_messages()
     results = send_telegram_messages(settings, messages)
     for result in results:
         log(result)
+    source_reports = reports if reports is not None else cached_reports or []
+    for report in source_reports:
+        if report.get("platform_name") == "小红书" and str(report.get("content_signature", "")).strip():
+            set_delivery_signature("report", "xhs", str(report["content_signature"]).strip())
 
     if not bark_completion:
         return len(messages)

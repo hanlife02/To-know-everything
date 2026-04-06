@@ -19,7 +19,7 @@ from flask import Flask, flash, jsonify, redirect, render_template, request, url
 
 from bilibili.web import load_page_data as load_bilibili_page_data
 from bilibili.web import refresh_page_data as refresh_bilibili_page_data
-from content_filters import filter_dashboard_for_today, get_today, parse_item_date
+from content_filters import filter_dashboard_for_summary, get_today, parse_item_date
 from daily_job import refresh_dashboard_data, run_all as run_full_pipeline
 from daily_report import (
     build_ai_daily_report_messages,
@@ -54,6 +54,7 @@ from materials_notice.web import load_page_data as load_materials_notices_page_d
 from materials_notice.web import refresh_page_data as refresh_materials_notices_page_data
 from xhs.web import load_page_data as load_xhs_page_data
 from xhs.web import refresh_page_data as refresh_xhs_page_data
+from delivery_state import set_delivery_signature
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = "content-digest-dashboard"
@@ -76,27 +77,36 @@ def load_dashboard_data() -> dict:
     }
 
 
-def build_notify_payload(target: str, dashboard: dict) -> tuple[str, str]:
-    daily_dashboard = filter_dashboard_for_today(dashboard)
+def build_notify_payload(target: str, dashboard: dict) -> tuple[str, str, dict[str, str]]:
+    filtered_dashboard = filter_dashboard_for_summary(dashboard)
+    state_updates: dict[str, str] = {}
 
     if target == "bilibili":
-        bilibili = daily_dashboard["bilibili"]
-        return build_platform_digest("Bilibili", bilibili["overview"], bilibili["videos"])
+        bilibili = filtered_dashboard["bilibili"]
+        return (*build_platform_digest("Bilibili", bilibili["overview"], bilibili["videos"]), state_updates)
     if target == "materials_notices":
-        materials_notices = daily_dashboard["materials_notices"]
-        return build_platform_digest(
+        materials_notices = filtered_dashboard["materials_notices"]
+        return (*build_platform_digest(
             "材料学院通知",
             materials_notices["overview"],
             materials_notices["notices"],
-        )
+        ), state_updates)
     if target == "xhs":
-        xhs = daily_dashboard["xhs"]
-        return build_platform_digest("小红书", xhs["overview"], xhs["notes"])
+        xhs = filtered_dashboard["xhs"]
+        if xhs.get("notes") and xhs.get("content_signature"):
+            state_updates["xhs"] = str(xhs["content_signature"]).strip()
+        return (*build_platform_digest("小红书", xhs["overview"], xhs["notes"]), state_updates)
     if target == "all":
-        return build_combined_digest(
-            daily_dashboard["bilibili"],
-            daily_dashboard["materials_notices"],
-            daily_dashboard["xhs"],
+        xhs = filtered_dashboard["xhs"]
+        if xhs.get("notes") and xhs.get("content_signature"):
+            state_updates["xhs"] = str(xhs["content_signature"]).strip()
+        return (
+            *build_combined_digest(
+                filtered_dashboard["bilibili"],
+                filtered_dashboard["materials_notices"],
+                filtered_dashboard["xhs"],
+            ),
+            state_updates,
         )
     raise ValueError(f"Unsupported notification target: {target}")
 
@@ -455,11 +465,14 @@ def notify_send():
     dashboard = load_dashboard_data()
 
     try:
-        title, body = build_notify_payload(target, dashboard)
+        title, body, state_updates = build_notify_payload(target, dashboard)
         results = send_notification(settings, channel, title, body)
     except Exception as exc:  # noqa: BLE001
         flash(f"推送失败：{exc}", "error")
     else:
+        for platform, signature in state_updates.items():
+            if signature:
+                set_delivery_signature("summary", platform, signature)
         flash(" ".join(results), "success")
 
     return redirect_back("notifications_page")
@@ -503,6 +516,12 @@ def push_ai_daily_report():
     except Exception as exc:  # noqa: BLE001
         flash(f"AI 日报推送失败：{exc}", "error")
     else:
+        for message in cache.get("reports", []):
+            if (
+                str(message.get("platform_name", "")).strip() == "小红书"
+                and str(message.get("content_signature", "")).strip()
+            ):
+                set_delivery_signature("report", "xhs", str(message["content_signature"]).strip())
         if notification_settings.bark_key:
             try:
                 bark_result = send_bark_notification(

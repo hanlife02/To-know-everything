@@ -203,7 +203,7 @@ def build_platform_digest(
     limit: int = 5,
 ) -> tuple[str, str]:
     if not items:
-        raise ValueError(f"{platform_name} 今天没有可推送的内容。")
+        raise ValueError(f"{platform_name} 当前没有可推送的内容。")
 
     lines = [overview.strip()]
     for item in items[:limit]:
@@ -251,7 +251,7 @@ def build_combined_digest(
             body_parts.append("")
 
     if not body_parts:
-        raise ValueError("今天没有可推送的内容。")
+        raise ValueError("当前没有满足推送条件的内容。")
 
     body = "\n".join(part for part in body_parts if part is not None).strip()
     return title, body
