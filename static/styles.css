@@ -88,6 +88,7 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
+  align-items: center;
 }
 
 .site-nav a {
@@ -96,9 +97,20 @@ select {
   color: var(--text);
 }
 
+.site-nav form {
+  margin: 0 0 0 auto;
+}
+
 .site-nav a.active {
   border-bottom-color: var(--accent);
   color: var(--accent);
+}
+
+.nav-logout-button {
+  width: auto;
+  min-height: auto;
+  padding: 8px 14px;
+  border-radius: 999px;
 }
 
 .flash-list {
@@ -565,6 +577,34 @@ button:hover,
 
 .empty-state {
   margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.auth-shell {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 180px);
+  padding: 28px 0 40px;
+}
+
+.auth-card {
+  width: min(560px, 100%);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(199, 85, 55, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(252, 250, 246, 0.98) 100%);
+  box-shadow: var(--shadow-soft);
+}
+
+.auth-form {
+  margin-top: 24px;
+}
+
+.auth-tip {
+  margin: 14px 0 0;
   color: var(--muted);
   line-height: 1.75;
 }

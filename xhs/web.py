@@ -111,7 +111,3 @@ def index():
 @app.route("/api/notes")
 def notes_api():
     return jsonify(load_page_data())
-
-
-if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=8001)

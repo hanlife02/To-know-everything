@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+from secrets import compare_digest
 from urllib.parse import urlparse
 
 from automation import (
@@ -15,7 +16,7 @@ from automation import (
     save_automation_settings,
     serialize_automation_settings,
 )
-from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 
 from bilibili.web import load_page_data as load_bilibili_page_data
 from bilibili.web import refresh_page_data as refresh_bilibili_page_data
@@ -52,21 +53,72 @@ from notifications import (
 )
 from materials_notice.web import load_page_data as load_materials_notices_page_data
 from materials_notice.web import refresh_page_data as refresh_materials_notices_page_data
+from runtime_config import get_host, get_port, load_local_env, parse_env_bool
 from xhs.web import load_page_data as load_xhs_page_data
 from xhs.web import refresh_page_data as refresh_xhs_page_data
 from delivery_state import set_delivery_signature
 
+ACCESS_KEY_ENV = "APP_ACCESS_KEY"
+ACCESS_SESSION_KEY = "access_granted"
+ALLOWED_ANON_ENDPOINTS = {"login", "static"}
+
+
+load_local_env()
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.secret_key = "content-digest-dashboard"
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "content-digest-dashboard-dev-secret")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=parse_env_bool(os.getenv("SESSION_COOKIE_SECURE", ""), False),
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+)
 
 
 def ensure_automation_scheduler() -> None:
     automation_scheduler.start()
 
 
+def get_access_key() -> str:
+    return os.getenv(ACCESS_KEY_ENV, "").strip()
+
+
+def has_valid_access_key(candidate: str) -> bool:
+    configured_key = get_access_key()
+    submitted_key = candidate.strip()
+    return bool(configured_key and submitted_key) and compare_digest(submitted_key, configured_key)
+
+
+def request_has_valid_access_key() -> bool:
+    return has_valid_access_key(request.headers.get("X-API-Key", ""))
+
+
+def is_authenticated() -> bool:
+    return bool(session.get(ACCESS_SESSION_KEY))
+
+
+def resolve_redirect_target(target: str, default_endpoint: str = "index") -> str:
+    candidate = target.strip()
+    if candidate:
+        parsed = urlparse(candidate)
+        if (not parsed.netloc or parsed.netloc == request.host) and parsed.scheme in ("", "http", "https"):
+            return candidate
+    return url_for(default_endpoint)
+
+
 @app.before_request
-def ensure_automation_scheduler_before_request() -> None:
+def ensure_automation_scheduler_before_request():
     ensure_automation_scheduler()
+
+    if request.endpoint in ALLOWED_ANON_ENDPOINTS or request.path == "/favicon.ico":
+        return None
+    if request_has_valid_access_key() or is_authenticated():
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    next_target = request.full_path if request.query_string else request.path
+    return redirect(url_for("login", next=next_target))
 
 
 def load_dashboard_data() -> dict:
@@ -113,11 +165,49 @@ def build_notify_payload(target: str, dashboard: dict) -> tuple[str, str, dict[s
 
 def redirect_back(default_endpoint: str):
     target = request.form.get("next", "").strip() or request.referrer or ""
-    if target:
-        parsed = urlparse(target)
-        if (not parsed.netloc or parsed.netloc == request.host) and parsed.scheme in ("", "http", "https"):
-            return redirect(target)
-    return redirect(url_for(default_endpoint))
+    return redirect(resolve_redirect_target(target, default_endpoint))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    next_target = request.form.get("next", "").strip() or request.args.get("next", "").strip()
+
+    if not get_access_key():
+        if request.method == "POST":
+            flash("APP_ACCESS_KEY 未配置，无法启用访问保护。", "error")
+        return render_template(
+            "login.html",
+            active_page="login",
+            next_target=next_target,
+            access_key_configured=False,
+        )
+
+    if is_authenticated():
+        return redirect(resolve_redirect_target(next_target, "index"))
+
+    if request.method == "POST":
+        submitted_key = request.form.get("api_key", "")
+        if has_valid_access_key(submitted_key):
+            session.clear()
+            session.permanent = True
+            session[ACCESS_SESSION_KEY] = True
+            flash("访问验证通过。", "success")
+            return redirect(resolve_redirect_target(next_target, "index"))
+        flash("API key 不正确。", "error")
+
+    return render_template(
+        "login.html",
+        active_page="login",
+        next_target=next_target,
+        access_key_configured=True,
+    )
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    flash("已退出访问。", "success")
+    return redirect(url_for("login"))
 
 
 @app.route("/")
@@ -593,4 +683,8 @@ if __name__ == "__main__":
     debug = True
     if not debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         ensure_automation_scheduler()
-    app.run(debug=debug, host="127.0.0.1", port=8000)
+    app.run(
+        debug=debug,
+        host=get_host("APP_HOST", "127.0.0.1"),
+        port=get_port("APP_PORT", 8000),
+    )

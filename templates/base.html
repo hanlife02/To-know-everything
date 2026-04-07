@@ -12,6 +12,7 @@
         <div class="site-brand">
           <a class="site-title" href="{{ url_for('index') }}">内容摘要看板</a>
         </div>
+        {% if session.get("access_granted") %}
         <nav class="site-nav">
           <a href="{{ url_for('index') }}" {% if active_page == "home" %}class="active"{% endif %}>首页</a>
           <a href="{{ url_for('notifications_page') }}" {% if active_page == "notifications" %}class="active"{% endif %}>推送设置</a>
@@ -20,7 +21,11 @@
           <a href="{{ url_for('bilibili_page') }}" {% if active_page == "bilibili" %}class="active"{% endif %}>哔哩哔哩</a>
           <a href="{{ url_for('materials_notices_page') }}" {% if active_page == "materials_notices" %}class="active"{% endif %}>材料学院通知</a>
           <a href="{{ url_for('xhs_page') }}" {% if active_page == "xhs" %}class="active"{% endif %}>小红书</a>
+          <form action="{{ url_for('logout') }}" method="post" class="nav-logout">
+            <button type="submit" class="nav-logout-button">退出</button>
+          </form>
         </nav>
+        {% endif %}
       </header>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
