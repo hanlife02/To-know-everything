@@ -10,6 +10,7 @@ import requests
 
 SETTINGS_PATH = Path(__file__).resolve().parent / "data" / "notification_settings.json"
 TELEGRAM_TEXT_LIMIT = 4000
+BARK_TEXT_LIMIT = 3500
 
 
 @dataclass(slots=True)
@@ -123,6 +124,56 @@ def send_telegram_notification(
     return send_telegram_text(settings, build_telegram_text(title, body))
 
 
+def split_notification_messages(
+    title: str,
+    body: str,
+    *,
+    max_text_length: int,
+) -> list[tuple[str, str]]:
+    title_text = title.strip()
+    body_text = body.strip()
+    if len(build_telegram_text(title_text, body_text)) <= max_text_length:
+        return [(title_text, body_text)]
+
+    chunks: list[str] = []
+    current_lines: list[str] = []
+    current_length = 0
+    segments = body_text.split("\n\n")
+
+    for segment in segments:
+        piece = segment.strip()
+        if not piece:
+            continue
+
+        candidate_length = len(piece) if not current_lines else current_length + 2 + len(piece)
+        part_title = f"{title_text}（第 {len(chunks) + 1} 部分）"
+        if len(build_telegram_text(part_title, piece)) > max_text_length and not current_lines:
+            raise ValueError(f"单条摘要内容过长，无法拆分发送：{piece[:80]}")
+
+        if current_lines and len(build_telegram_text(part_title, "\n\n".join(current_lines + [piece]))) > max_text_length:
+            chunks.append("\n\n".join(current_lines))
+            current_lines = [piece]
+            current_length = len(piece)
+            continue
+
+        current_lines.append(piece)
+        current_length = candidate_length
+
+    if current_lines:
+        chunks.append("\n\n".join(current_lines))
+
+    if not chunks:
+        raise ValueError("通知内容为空，无法发送。")
+
+    if len(chunks) == 1:
+        return [(title_text, chunks[0])]
+
+    return [
+        (f"{title_text}（第 {index} / {len(chunks)} 部分）", chunk)
+        for index, chunk in enumerate(chunks, start=1)
+    ]
+
+
 def build_telegram_text(title: str, body: str) -> str:
     return f"{title.strip()}\n\n{body.strip()}".strip()
 
@@ -184,9 +235,17 @@ def send_notification(
     results: list[str] = []
 
     if channel in {"bark", "all"}:
-        results.append(send_bark_notification(settings, title, body))
+        bark_messages = split_notification_messages(title, body, max_text_length=BARK_TEXT_LIMIT)
+        for index, (part_title, part_body) in enumerate(bark_messages, start=1):
+            send_bark_notification(settings, part_title, part_body)
+            results.append(
+                "Bark 通知发送成功。"
+                if len(bark_messages) == 1
+                else f"Bark 第 {index} 条消息发送成功。"
+            )
     if channel in {"telegram", "all"}:
-        results.append(send_telegram_notification(settings, title, body))
+        telegram_messages = split_notification_messages(title, body, max_text_length=TELEGRAM_TEXT_LIMIT)
+        results.extend(send_telegram_messages(settings, telegram_messages))
 
     if not results:
         raise ValueError(f"Unsupported notification channel: {channel}")
@@ -200,13 +259,12 @@ def build_platform_digest(
     items: list[dict[str, Any]],
     *,
     item_title_key: str = "title",
-    limit: int = 5,
 ) -> tuple[str, str]:
     if not items:
         raise ValueError(f"{platform_name} 当前没有可推送的内容。")
 
     lines = [overview.strip()]
-    for item in items[:limit]:
+    for item in items:
         title = item.get(item_title_key, "").strip()
         summary = item.get("summary", "").strip()
         lines.append(f"{item.get('rank', '-')}. {title}")
@@ -243,7 +301,7 @@ def build_combined_digest(
         if not items:
             continue
         body_parts.extend([section_title, overview, ""])
-        for item in items[:3]:
+        for item in items:
             body_parts.append(f"{item.get('rank', '-')}. {item.get('title', '')}")
             body_parts.append(item.get("summary", "").strip())
             if item.get("url"):

@@ -117,45 +117,54 @@
           <div class="setting-row-group">
             <div class="setting-row">
               <div class="setting-copy">
-                <span class="setting-label">顺带推送摘要</span>
-                <span class="setting-hint">执行日报时一并发送摘要</span>
+                <span class="setting-label">推送模式</span>
+                <span class="setting-hint">自动化任务只会按一种模式执行：摘要或日报</span>
               </div>
-              <label class="switch" aria-label="执行日报时顺带推送摘要">
-                <input type="checkbox" name="push_summary_too" value="true" {% if automation_settings.push_summary_too %}checked{% endif %}>
-                <span class="switch-slider"></span>
+            </div>
+
+            <div class="inline-form-grid automation-grid">
+              <label>
+                <span>自动推送内容</span>
+                <select name="delivery_mode">
+                  <option value="summary" {% if automation_settings.delivery_mode == "summary" %}selected{% endif %}>摘要</option>
+                  <option value="report" {% if automation_settings.delivery_mode == "report" %}selected{% endif %}>日报</option>
+                </select>
+              </label>
+              <label>
+                <span>摘要目标</span>
+                <select name="summary_target">
+                  <option value="all" {% if automation_settings.summary_target == "all" %}selected{% endif %}>统一摘要</option>
+                  <option value="bilibili" {% if automation_settings.summary_target == "bilibili" %}selected{% endif %}>哔哩哔哩</option>
+                  <option value="materials_notices" {% if automation_settings.summary_target == "materials_notices" %}selected{% endif %}>材料学院通知</option>
+                  <option value="xhs" {% if automation_settings.summary_target == "xhs" %}selected{% endif %}>小红书</option>
+                </select>
               </label>
             </div>
 
             <div class="setting-row">
               <div class="setting-copy">
+                <span class="setting-label">摘要渠道</span>
+                <span class="setting-hint">仅在推送模式为摘要时生效</span>
+              </div>
+              <div class="setting-copy setting-copy-compact">
+                <select name="summary_channel">
+                  <option value="all" {% if automation_settings.summary_channel == "all" %}selected{% endif %}>全部</option>
+                  <option value="telegram" {% if automation_settings.summary_channel == "telegram" %}selected{% endif %}>Telegram</option>
+                  <option value="bark" {% if automation_settings.summary_channel == "bark" %}selected{% endif %}>Bark</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-copy">
                 <span class="setting-label">完成提醒</span>
-                <span class="setting-hint">日报推送后发送 Bark 提醒</span>
+                <span class="setting-hint">仅在推送模式为日报时，日报推送完成后发送 Bark 提醒</span>
               </div>
               <label class="switch" aria-label="日报推送完成后发送 Bark 完成通知">
                 <input type="checkbox" name="bark_completion" value="true" {% if automation_settings.bark_completion %}checked{% endif %}>
                 <span class="switch-slider"></span>
               </label>
             </div>
-          </div>
-
-          <div class="inline-form-grid automation-grid">
-            <label>
-              <span>摘要目标</span>
-              <select name="summary_target">
-                <option value="all" {% if automation_settings.summary_target == "all" %}selected{% endif %}>统一摘要</option>
-                <option value="bilibili" {% if automation_settings.summary_target == "bilibili" %}selected{% endif %}>哔哩哔哩</option>
-                <option value="materials_notices" {% if automation_settings.summary_target == "materials_notices" %}selected{% endif %}>材料学院通知</option>
-                <option value="xhs" {% if automation_settings.summary_target == "xhs" %}selected{% endif %}>小红书</option>
-              </select>
-            </label>
-            <label>
-              <span>摘要渠道</span>
-              <select name="summary_channel">
-                <option value="all" {% if automation_settings.summary_channel == "all" %}selected{% endif %}>全部</option>
-                <option value="telegram" {% if automation_settings.summary_channel == "telegram" %}selected{% endif %}>Telegram</option>
-                <option value="bark" {% if automation_settings.summary_channel == "bark" %}selected{% endif %}>Bark</option>
-              </select>
-            </label>
           </div>
 
           <button type="submit" class="primary-button">保存自动化配置</button>
@@ -178,6 +187,7 @@
           <p>Bark：{{ "已配置" if notification_status.bark_configured else "未配置" }}{% if notification_status.masked_bark_key %}（{{ notification_status.masked_bark_key }}）{% endif %}</p>
           <p>Telegram：{{ "已配置" if notification_status.telegram_configured else "未配置" }}{% if notification_status.masked_telegram_bot_token %}（{{ notification_status.masked_telegram_bot_token }} / {{ notification_status.masked_telegram_chat_id }}）{% endif %}</p>
           <p>自动执行时间：{{ automation_status.schedule }}</p>
+          <p>自动推送模式：{{ automation_status.delivery_mode_text }}</p>
           <p>最近尝试：{{ automation_status.last_attempt_at }}</p>
           <p>最近成功：{{ automation_status.last_success_at }}</p>
           <p>最近状态：{{ automation_status.last_status }}</p>

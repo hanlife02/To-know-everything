@@ -206,16 +206,20 @@ def push_reports(
 
 def run_all(
     *,
+    generate_ai_reports: bool = True,
     push_summary_too: bool = False,
     summary_channel: str = "all",
     summary_target: str = "all",
     bark_completion: bool = True,
 ) -> dict[str, int]:
     dashboard = refresh_dashboard_data()
-    reports = generate_reports(dashboard)
     if push_summary_too:
         push_summary(summary_channel, summary_target, dashboard)
-    pushed_reports = push_reports(reports, bark_completion=bark_completion)
+    reports: list[dict[str, Any]] = []
+    pushed_reports = 0
+    if generate_ai_reports:
+        reports = generate_reports(dashboard)
+        pushed_reports = push_reports(reports, bark_completion=bark_completion)
     return {
         "bilibili_count": len(dashboard["bilibili"]["videos"]),
         "materials_count": len(dashboard["materials_notices"]["notices"]),
@@ -282,6 +286,7 @@ def main() -> None:
         return
 
     run_all(
+        generate_ai_reports=True,
         push_summary_too=args.push_summary_too,
         summary_channel=args.summary_channel,
         summary_target=args.summary_target,

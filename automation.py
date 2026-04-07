@@ -7,9 +7,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from daily_job import run_all
+from daily_job import push_summary, refresh_dashboard_data, run_all
 
 SETTINGS_PATH = Path(__file__).resolve().parent / "data" / "automation_settings.json"
+SUPPORTED_DELIVERY_MODES = {"summary", "report"}
 SUPPORTED_SUMMARY_CHANNELS = {"bark", "telegram", "all"}
 SUPPORTED_SUMMARY_TARGETS = {"bilibili", "materials_notices", "xhs", "all"}
 _SETTINGS_LOCK = threading.RLock()
@@ -20,7 +21,7 @@ class AutomationSettings:
     enabled: bool = False
     hour: int = 9
     minute: int = 0
-    push_summary_too: bool = False
+    delivery_mode: str = "report"
     summary_channel: str = "all"
     summary_target: str = "all"
     bark_completion: bool = True
@@ -53,6 +54,8 @@ def clamp_int(value: Any, *, minimum: int, maximum: int, default: int) -> int:
 def normalize_settings(settings: AutomationSettings) -> AutomationSettings:
     settings.hour = clamp_int(settings.hour, minimum=0, maximum=23, default=9)
     settings.minute = clamp_int(settings.minute, minimum=0, maximum=59, default=0)
+    if settings.delivery_mode not in SUPPORTED_DELIVERY_MODES:
+        settings.delivery_mode = "report"
     if settings.summary_channel not in SUPPORTED_SUMMARY_CHANNELS:
         settings.summary_channel = "all"
     if settings.summary_target not in SUPPORTED_SUMMARY_TARGETS:
@@ -69,11 +72,17 @@ def load_automation_settings(path: Path = SETTINGS_PATH) -> AutomationSettings:
     settings = AutomationSettings()
     if path.exists():
         payload = json.loads(path.read_text(encoding="utf-8"))
+        delivery_mode = str(payload.get("delivery_mode", "")).strip()
+        if delivery_mode not in SUPPORTED_DELIVERY_MODES:
+            if parse_bool(payload.get("generate_ai_reports"), True):
+                delivery_mode = "report"
+            else:
+                delivery_mode = "summary"
         settings = AutomationSettings(
             enabled=parse_bool(payload.get("enabled"), False),
             hour=clamp_int(payload.get("hour"), minimum=0, maximum=23, default=9),
             minute=clamp_int(payload.get("minute"), minimum=0, maximum=59, default=0),
-            push_summary_too=parse_bool(payload.get("push_summary_too"), False),
+            delivery_mode=delivery_mode,
             summary_channel=str(payload.get("summary_channel", "all")).strip(),
             summary_target=str(payload.get("summary_target", "all")).strip(),
             bark_completion=parse_bool(payload.get("bark_completion"), True),
@@ -105,7 +114,7 @@ def serialize_automation_settings(settings: AutomationSettings) -> dict[str, Any
         "hour": settings.hour,
         "minute": settings.minute,
         "time_text": f"{settings.hour:02d}:{settings.minute:02d}",
-        "push_summary_too": settings.push_summary_too,
+        "delivery_mode": settings.delivery_mode,
         "summary_channel": settings.summary_channel,
         "summary_target": settings.summary_target,
         "bark_completion": settings.bark_completion,
@@ -120,11 +129,12 @@ def get_automation_status(settings: AutomationSettings) -> dict[str, Any]:
     return {
         "enabled": settings.enabled,
         "schedule": f"{settings.hour:02d}:{settings.minute:02d}",
+        "delivery_mode": settings.delivery_mode,
+        "delivery_mode_text": "摘要" if settings.delivery_mode == "summary" else "日报",
         "last_attempt_at": settings.last_attempt_at or "暂无",
         "last_success_at": settings.last_success_at or "暂无",
         "last_status": settings.last_status,
         "last_error": settings.last_error,
-        "push_summary_too": settings.push_summary_too,
         "summary_channel": settings.summary_channel,
         "summary_target": settings.summary_target,
         "bark_completion": settings.bark_completion,
@@ -177,12 +187,24 @@ def run_automation_job(path: Path = SETTINGS_PATH) -> dict[str, int]:
     update_automation_run_state(status="running", attempt_at=attempt_at, error="")
 
     try:
-        result = run_all(
-            push_summary_too=settings.push_summary_too,
-            summary_channel=settings.summary_channel,
-            summary_target=settings.summary_target,
-            bark_completion=settings.bark_completion,
-        )
+        if settings.delivery_mode == "summary":
+            dashboard = refresh_dashboard_data()
+            push_summary(settings.summary_channel, settings.summary_target, dashboard)
+            result = {
+                "bilibili_count": len(dashboard["bilibili"]["videos"]),
+                "materials_count": len(dashboard["materials_notices"]["notices"]),
+                "xhs_count": len(dashboard["xhs"]["notes"]),
+                "report_count": 0,
+                "pushed_report_count": 0,
+            }
+        else:
+            result = run_all(
+                generate_ai_reports=True,
+                push_summary_too=False,
+                summary_channel=settings.summary_channel,
+                summary_target=settings.summary_target,
+                bark_completion=settings.bark_completion,
+            )
     except Exception as exc:  # noqa: BLE001
         update_automation_run_state(
             status="error",

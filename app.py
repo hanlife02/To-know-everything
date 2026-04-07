@@ -15,6 +15,7 @@ from automation import (
     run_automation_job,
     save_automation_settings,
     serialize_automation_settings,
+    SUPPORTED_DELIVERY_MODES,
 )
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 
@@ -449,11 +450,14 @@ def save_notifications():
 @app.route("/settings/automation", methods=["POST"])
 def save_automation():
     current = load_automation_settings()
+    delivery_mode = request.form.get("delivery_mode", "report").strip()
+    if delivery_mode not in SUPPORTED_DELIVERY_MODES:
+        delivery_mode = "report"
     settings = AutomationSettings(
         enabled=parse_bool(request.form.get("enabled"), False),
         hour=clamp_int(request.form.get("hour"), minimum=0, maximum=23, default=9),
         minute=clamp_int(request.form.get("minute"), minimum=0, maximum=59, default=0),
-        push_summary_too=parse_bool(request.form.get("push_summary_too"), False),
+        delivery_mode=delivery_mode,
         summary_channel=request.form.get("summary_channel", "all").strip(),
         summary_target=request.form.get("summary_target", "all").strip(),
         bark_completion=parse_bool(request.form.get("bark_completion"), False),
@@ -635,21 +639,33 @@ def push_ai_daily_report():
 
 @app.route("/automation/run", methods=["POST"])
 def run_automation_now():
+    settings = load_automation_settings()
     try:
         result = run_automation_job()
     except Exception as exc:  # noqa: BLE001
         flash(f"自动任务执行失败：{exc}", "error")
     else:
-        flash(
-            (
-                "自动任务执行完成。"
-                f" Bilibili {result['bilibili_count']} 条，"
-                f"材料学院通知 {result['materials_count']} 条，"
-                f"小红书 {result['xhs_count']} 条，"
-                f"日报 {result['report_count']} 份。"
-            ),
-            "success",
-        )
+        if settings.delivery_mode == "summary":
+            flash(
+                (
+                    "自动摘要推送完成。"
+                    f" Bilibili {result['bilibili_count']} 条，"
+                    f"材料学院通知 {result['materials_count']} 条，"
+                    f"小红书 {result['xhs_count']} 条。"
+                ),
+                "success",
+            )
+        else:
+            flash(
+                (
+                    "自动日报推送完成。"
+                    f" Bilibili {result['bilibili_count']} 条，"
+                    f"材料学院通知 {result['materials_count']} 条，"
+                    f"小红书 {result['xhs_count']} 条，"
+                    f"日报 {result['report_count']} 份。"
+                ),
+                "success",
+            )
     return redirect_back("notifications_page")
 
 
