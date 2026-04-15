@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.domain.enums import ContentPriority, DeliveryMode, NotificationChannel
 
@@ -36,7 +36,7 @@ class ContentItem:
 class SourceFetchResult:
     source_key: str
     items: list[ContentItem]
-    fetched_at: datetime = field(default_factory=datetime.utcnow)
+    fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -55,6 +55,16 @@ class NotificationMessage:
     disable_web_page_preview: bool = True
     metadata: dict[str, str] = field(default_factory=dict)
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "title": self.title,
+            "body": self.body,
+            "mode": self.mode.value,
+            "targets": [target.value for target in self.targets],
+            "disable_web_page_preview": self.disable_web_page_preview,
+            "metadata": dict(self.metadata),
+        }
+
 
 @dataclass(slots=True)
 class DeliveryReceipt:
@@ -69,6 +79,14 @@ class PipelineResult:
     items: list[ContentItem]
     messages: list[NotificationMessage]
     source_results: list[SourceFetchResult]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "mode": self.mode.value,
+            "items": [item.as_dict() for item in self.items],
+            "messages": [message.as_dict() for message in self.messages],
+            "source_results": [result.as_dict() for result in self.source_results],
+        }
 
 
 @dataclass(slots=True)
@@ -87,4 +105,3 @@ class JobRunResult:
             "message_count": self.message_count,
             "receipts": [asdict(receipt) for receipt in self.receipts],
         }
-

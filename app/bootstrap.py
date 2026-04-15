@@ -8,6 +8,7 @@ from app.notifications.router import NotificationRouter, build_notification_rout
 from app.services.dashboard_service import DashboardService
 from app.services.notification_service import NotificationService
 from app.services.report_service import ReportService
+from app.sources.builtins import register_builtin_sources
 from app.sources.registry import SourceRegistry
 from app.storage.cache_store import CacheStore
 from app.storage.paths import StoragePaths
@@ -32,6 +33,7 @@ def create_app_context() -> AppContext:
     settings = AppSettings.from_env()
     paths = StoragePaths.ensure(settings.data_dir)
     registry = SourceRegistry()
+    register_builtin_sources(registry, settings, paths)
     cache_store = CacheStore(paths.cache)
     state_store = StateStore(paths.state)
     report_generator = ReportGenerator()
@@ -58,4 +60,3 @@ def create_app_context() -> AppContext:
         notification_service=notification_service,
         report_service=report_service,
     )
-

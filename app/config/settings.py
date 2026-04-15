@@ -36,6 +36,7 @@ class BarkSettings:
     enabled: bool = False
     server_url: str = "https://api.day.app"
     key: str | None = None
+    group: str | None = None
 
     def is_configured(self) -> bool:
         return self.enabled and bool(self.key)
@@ -49,6 +50,34 @@ class AutomationSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PkuReagentSettings:
+    enabled: bool = False
+    base_url: str = "https://reagent.pku.edu.cn"
+    iaaa_base_url: str = "https://iaaa.pku.edu.cn/iaaa"
+    username: str | None = None
+    password: str | None = None
+    token: str | None = None
+    cookie_header: str | None = None
+    captcha_code: str = ""
+    sms_code: str = ""
+    otp_code: str = ""
+    start_date: str | None = None
+    end_date: str | None = None
+    keyword: str = ""
+    group_code: str = ""
+    page_size: int = 20
+
+    def has_static_session(self) -> bool:
+        return bool(self.username and self.token and self.cookie_header)
+
+    def has_login_credentials(self) -> bool:
+        return bool(self.username and self.password)
+
+    def is_configured(self) -> bool:
+        return self.enabled and (self.has_static_session() or self.has_login_credentials())
+
+
+@dataclass(frozen=True, slots=True)
 class AppSettings:
     env: str = "development"
     log_level: str = "INFO"
@@ -56,27 +85,59 @@ class AppSettings:
     telegram: TelegramSettings = field(default_factory=TelegramSettings)
     bark: BarkSettings = field(default_factory=BarkSettings)
     automation: AutomationSettings = field(default_factory=AutomationSettings)
+    pku_reagent: PkuReagentSettings = field(default_factory=PkuReagentSettings)
     web_api_key: str | None = None
     enabled_sources: tuple[str, ...] = field(default_factory=tuple)
 
     @classmethod
     def from_env(cls) -> "AppSettings":
+        telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        bark_key = os.getenv("BARK_KEY")
+        pku_reagent_username = os.getenv("PKU_REAGENT_USERNAME")
+        pku_reagent_password = os.getenv("PKU_REAGENT_PASSWORD")
+        pku_reagent_token = os.getenv("PKU_REAGENT_TOKEN")
+        pku_reagent_cookie = os.getenv("PKU_REAGENT_COOKIE")
+        telegram_enabled_default = bool(telegram_bot_token and telegram_chat_id)
+        bark_enabled_default = bool(bark_key)
+        pku_reagent_enabled_default = bool(
+            (pku_reagent_username and pku_reagent_password)
+            or (pku_reagent_username and pku_reagent_token and pku_reagent_cookie)
+        )
         telegram = TelegramSettings(
-            enabled=_parse_bool(os.getenv("TELEGRAM_ENABLED")),
-            bot_token=os.getenv("TELEGRAM_BOT_TOKEN"),
-            chat_id=os.getenv("TELEGRAM_CHAT_ID"),
+            enabled=_parse_bool(os.getenv("TELEGRAM_ENABLED"), default=telegram_enabled_default),
+            bot_token=telegram_bot_token,
+            chat_id=telegram_chat_id,
             disable_web_page_preview=_parse_bool(os.getenv("TELEGRAM_DISABLE_WEB_PAGE_PREVIEW"), default=True),
         )
         bark = BarkSettings(
-            enabled=_parse_bool(os.getenv("BARK_ENABLED")),
+            enabled=_parse_bool(os.getenv("BARK_ENABLED"), default=bark_enabled_default),
             server_url=os.getenv("BARK_SERVER_URL", "https://api.day.app"),
-            key=os.getenv("BARK_KEY"),
+            key=bark_key,
+            group=os.getenv("BARK_GROUP"),
         )
         automation_mode = DeliveryMode.from_value(os.getenv("AUTOMATION_DEFAULT_MODE", DeliveryMode.SUMMARY.value))
         automation = AutomationSettings(
             enabled=_parse_bool(os.getenv("AUTOMATION_ENABLED")),
             daily_time=os.getenv("AUTOMATION_DAILY_TIME", DEFAULT_AUTOMATION_TIME),
             default_mode=automation_mode,
+        )
+        pku_reagent = PkuReagentSettings(
+            enabled=_parse_bool(os.getenv("PKU_REAGENT_ENABLED"), default=pku_reagent_enabled_default),
+            base_url=os.getenv("PKU_REAGENT_BASE_URL", "https://reagent.pku.edu.cn"),
+            iaaa_base_url=os.getenv("PKU_REAGENT_IAAA_BASE_URL", "https://iaaa.pku.edu.cn/iaaa"),
+            username=pku_reagent_username,
+            password=pku_reagent_password,
+            token=pku_reagent_token,
+            cookie_header=pku_reagent_cookie,
+            captcha_code=os.getenv("PKU_REAGENT_CAPTCHA_CODE", ""),
+            sms_code=os.getenv("PKU_REAGENT_SMS_CODE", ""),
+            otp_code=os.getenv("PKU_REAGENT_OTP_CODE", ""),
+            start_date=os.getenv("PKU_REAGENT_START_DATE"),
+            end_date=os.getenv("PKU_REAGENT_END_DATE"),
+            keyword=os.getenv("PKU_REAGENT_KEYWORD", ""),
+            group_code=os.getenv("PKU_REAGENT_GROUP_CODE", ""),
+            page_size=int(os.getenv("PKU_REAGENT_PAGE_SIZE", "20")),
         )
         return cls(
             env=os.getenv("APP_ENV", "development"),
@@ -85,6 +146,7 @@ class AppSettings:
             telegram=telegram,
             bark=bark,
             automation=automation,
+            pku_reagent=pku_reagent,
             web_api_key=os.getenv("WEB_API_KEY"),
             enabled_sources=_parse_csv(os.getenv("ENABLED_SOURCES")),
         )
@@ -96,4 +158,3 @@ class AppSettings:
         if self.bark.enabled:
             channels.append(NotificationChannel.BARK)
         return tuple(channels)
-

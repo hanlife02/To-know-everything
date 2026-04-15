@@ -1,0 +1,15 @@
+from __future__ import annotations
+
+from app.config.settings import AppSettings
+from app.sources.pku_reagent.service import PkuReagentOrderSource
+from app.sources.registry import SourceRegistry
+from app.storage.paths import StoragePaths
+
+
+def register_builtin_sources(registry: SourceRegistry, settings: AppSettings, paths: StoragePaths) -> None:
+    registry.register(
+        PkuReagentOrderSource.from_settings(
+            settings.pku_reagent,
+            session_cache_path=paths.settings / "pku_reagent_session.json",
+        )
+    )

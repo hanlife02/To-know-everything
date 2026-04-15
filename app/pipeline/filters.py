@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.domain.models import ContentItem
 
@@ -8,7 +8,7 @@ from app.domain.models import ContentItem
 def filter_recent_items(items: list[ContentItem], max_age_days: int | None = None) -> list[ContentItem]:
     if max_age_days is None:
         return items
-    threshold = datetime.utcnow() - timedelta(days=max_age_days)
+    threshold = datetime.now(UTC) - timedelta(days=max_age_days)
     return [item for item in items if item.published_at is None or item.published_at >= threshold]
 
 
@@ -22,4 +22,3 @@ def deduplicate_items(items: list[ContentItem]) -> list[ContentItem]:
         seen.add(key)
         result.append(item)
     return result
-

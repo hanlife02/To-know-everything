@@ -30,6 +30,7 @@ class NotificationService:
         pipeline_result = self._dispatcher.run(mode)
         for source_result in pipeline_result.source_results:
             self._cache_store.write_source_result(source_result)
+        self._state_store.save_pipeline_snapshot(pipeline_result)
         receipts = self._router.deliver(pipeline_result.messages)
         result = JobRunResult(
             mode=mode,
@@ -40,4 +41,3 @@ class NotificationService:
         )
         self._state_store.append_run(result)
         return result
-
