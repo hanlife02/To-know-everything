@@ -1,8 +1,0 @@
-AGENTS.md
-.env
-__pycache__/
-*.pyc
-.venv/
-bilibili/data/
-xhs/data/
-data/
