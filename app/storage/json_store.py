@@ -1,0 +1,20 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+
+class JsonStore:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    def load(self, default: Any) -> Any:
+        if not self._path.exists():
+            return default
+        return json.loads(self._path.read_text(encoding="utf-8"))
+
+    def save(self, payload: Any) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
