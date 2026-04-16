@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -13,18 +12,20 @@ from _env import ensure_project_root_on_path, load_dotenv
 ensure_project_root_on_path()
 load_dotenv()
 
-from app.automation.jobs import run_delivery_job
+from app.automation.scheduler import DailyScheduler
 from app.bootstrap import create_app_context
-from app.domain.enums import DeliveryMode
 
 
 def main() -> int:
-    mode = DeliveryMode.SUMMARY
-    if len(sys.argv) > 1:
-        mode = DeliveryMode.from_value(sys.argv[1])
     context = create_app_context()
-    result = run_delivery_job(context, mode)
-    print(json.dumps(result.as_dict(), ensure_ascii=False, indent=2))
+    scheduler = DailyScheduler(context)
+    print(
+        "scheduler started: "
+        f"enabled={context.settings.automation.enabled}, "
+        f"time={context.settings.automation.daily_time}, "
+        f"mode={context.settings.automation.default_mode.value}"
+    )
+    scheduler.run_forever()
     return 0
 
 

@@ -5,16 +5,22 @@ from app.domain.models import ContentItem
 
 
 def build_summary_body(items: list[ContentItem]) -> str:
-    lines = ["今日摘要", ""]
-    for index, item in enumerate(items, start=1):
-        lines.append(f"{index}. {item.title}")
-        if item.summary:
-            lines.append(f"   {item.summary}")
-        lines.append(f"   来源: {item.source_key}")
-        if item.url:
-            lines.append(f"   链接: {item.url}")
-        lines.append("")
-    return "\n".join(lines).strip()
+    sections = [_build_item_section(item) for item in items]
+    return "\n\n".join(section for section in sections if section).strip()
+
+
+def _build_item_section(item: ContentItem) -> str:
+    lines = [f"title: {item.title}"]
+    status = item.metadata.get("status")
+    sku = item.metadata.get("sku")
+    order_time = item.metadata.get("order_time")
+    if status:
+        lines.append(f"status: {status}")
+    if sku:
+        lines.append(f"sku: {sku}")
+    if order_time:
+        lines.append(f"time: {order_time}")
+    return "\n".join(lines)
 
 
 def split_message(body: str, max_length: int = DEFAULT_MESSAGE_CHUNK_SIZE) -> list[str]:
@@ -30,4 +36,3 @@ def split_message(body: str, max_length: int = DEFAULT_MESSAGE_CHUNK_SIZE) -> li
     if current:
         segments.append(current.rstrip())
     return segments
-

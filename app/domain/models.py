@@ -12,6 +12,7 @@ class ContentItem:
     title: str
     summary: str
     url: str
+    source_name: str = ""
     published_at: datetime | None = None
     external_id: str | None = None
     priority: ContentPriority = ContentPriority.NORMAL
@@ -36,11 +37,13 @@ class ContentItem:
 class SourceFetchResult:
     source_key: str
     items: list[ContentItem]
+    source_name: str = ""
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def as_dict(self) -> dict[str, object]:
         return {
             "source_key": self.source_key,
+            "source_name": self.source_name,
             "fetched_at": self.fetched_at.isoformat(),
             "items": [item.as_dict() for item in self.items],
         }

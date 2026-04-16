@@ -16,8 +16,10 @@ from app.sources.pku_reagent.client import HttpPkuReagentClient, PkuReagentClien
 from app.sources.pku_reagent.models import PkuReagentOrderQuery
 from app.sources.pku_reagent.parser import parse_orders, to_content_item
 
+PKU_REAGENT_SOURCE_KEY = "pku_reagent_orders"
+PKU_REAGENT_SOURCE_NAME = "试剂平台通知"
 
-class PkuReagentOrderSource(SourceAdapter):
+class PkuReagentNotificationSource(SourceAdapter):
     def __init__(
         self,
         *,
@@ -38,15 +40,15 @@ class PkuReagentOrderSource(SourceAdapter):
         self.base_url = base_url
 
     @classmethod
-    def from_settings(cls, settings: PkuReagentSettings, *, session_cache_path: Path) -> "PkuReagentOrderSource":
+    def from_settings(cls, settings: PkuReagentSettings, *, session_cache_path: Path) -> "PkuReagentNotificationSource":
         authenticator: PkuReagentAuthenticator | None = None
         client: PkuReagentClient | None = None
         if settings.enabled:
             authenticator = _build_authenticator(settings, session_cache_path=session_cache_path)
             client = HttpPkuReagentClient(base_url=settings.base_url)
         return cls(
-            key="pku_reagent_orders",
-            name="PKU Reagent Orders",
+            key=PKU_REAGENT_SOURCE_KEY,
+            name=PKU_REAGENT_SOURCE_NAME,
             enabled=settings.enabled,
             authenticator=authenticator,
             client=client,
@@ -56,23 +58,26 @@ class PkuReagentOrderSource(SourceAdapter):
 
     def fetch(self) -> SourceFetchResult:
         if self.client is None or self.authenticator is None:
-            return SourceFetchResult(source_key=self.key, items=[])
+            return self.empty_result()
         try:
             session = self.authenticator.authenticate()
             if session is None:
-                return SourceFetchResult(source_key=self.key, items=[])
+                return self.empty_result()
             try:
                 rows = self.client.fetch_order_rows(session, self.query)
             except PkuReagentSessionExpiredError:
                 session = self.authenticator.authenticate(force_refresh=True)
                 if session is None:
-                    return SourceFetchResult(source_key=self.key, items=[])
+                    return self.empty_result()
                 rows = self.client.fetch_order_rows(session, self.query)
         except PkuReagentAuthError:
-            return SourceFetchResult(source_key=self.key, items=[])
+            return self.empty_result()
         orders = parse_orders(rows, base_url=self.base_url)
-        items = [to_content_item(order, source_key=self.key) for order in orders]
-        return SourceFetchResult(source_key=self.key, items=items)
+        items = [to_content_item(order, source_key=self.key, source_name=self.name) for order in orders]
+        return self.build_result(items)
+
+
+PkuReagentOrderSource = PkuReagentNotificationSource
 
 
 def _build_authenticator(

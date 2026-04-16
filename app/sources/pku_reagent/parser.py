@@ -54,7 +54,7 @@ def parse_orders(rows: list[dict[str, object]], *, base_url: str) -> list[PkuRea
     return [parse_order_row(row, base_url=base_url) for row in rows]
 
 
-def to_content_item(order: PkuReagentOrder, *, source_key: str) -> ContentItem:
+def to_content_item(order: PkuReagentOrder, *, source_key: str, source_name: str = "") -> ContentItem:
     summary_parts = [
         f"订单状态: {order.status.label}",
         f"订单编号: {order.order_no}",
@@ -69,6 +69,7 @@ def to_content_item(order: PkuReagentOrder, *, source_key: str) -> ContentItem:
         summary_parts.append(f"支付信息: {order.payment_info.replace(chr(10), ' / ')}")
     return ContentItem(
         source_key=source_key,
+        source_name=source_name,
         title=order.product_title or order.order_no,
         summary=" | ".join(summary_parts),
         url=order.detail_url,
@@ -94,4 +95,3 @@ def _extract_order_time(value: object) -> str:
     if lines:
         return lines[0]
     return ""
-

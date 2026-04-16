@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from app.domain.models import SourceFetchResult
+from app.domain.models import ContentItem, SourceFetchResult
 
 
 class SourceAdapter(ABC):
@@ -10,7 +10,12 @@ class SourceAdapter(ABC):
     name: str
     enabled: bool = True
 
+    def build_result(self, items: list[ContentItem]) -> SourceFetchResult:
+        return SourceFetchResult(source_key=self.key, source_name=self.name, items=items)
+
+    def empty_result(self) -> SourceFetchResult:
+        return self.build_result([])
+
     @abstractmethod
     def fetch(self) -> SourceFetchResult:
         raise NotImplementedError
-

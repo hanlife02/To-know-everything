@@ -58,6 +58,7 @@ class NotificationServiceTestCase(unittest.TestCase):
                 title="Order ready",
                 summary="filtered item",
                 url="https://example.com/orders/1",
+                source_name="试剂平台通知",
                 priority=ContentPriority.HIGH,
                 metadata={"status": "平台配送中"},
             )
@@ -71,7 +72,7 @@ class NotificationServiceTestCase(unittest.TestCase):
                 mode=DeliveryMode.SUMMARY,
                 items=[item],
                 messages=[message],
-                source_results=[SourceFetchResult(source_key="pku_reagent_orders", items=[item])],
+                source_results=[SourceFetchResult(source_key="pku_reagent_orders", source_name="试剂平台通知", items=[item])],
             )
             service = NotificationService(
                 settings=AppSettings(),

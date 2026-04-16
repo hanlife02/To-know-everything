@@ -6,6 +6,8 @@ from app.config.settings import PkuReagentSettings
 from app.domain.models import SourceFetchResult
 from app.sources.pku_reagent.models import PkuReagentOrderQuery
 from app.sources.pku_reagent.models import PkuReagentSession
+from app.sources.pku_reagent.service import PKU_REAGENT_SOURCE_KEY
+from app.sources.pku_reagent.service import PKU_REAGENT_SOURCE_NAME
 from app.sources.pku_reagent.service import PkuReagentOrderSource
 
 
@@ -47,8 +49,8 @@ class PkuReagentSourceTestCase(unittest.TestCase):
 
     def test_source_fetch_wraps_rows_as_content_items(self) -> None:
         source = PkuReagentOrderSource(
-            key="pku_reagent_orders",
-            name="PKU Reagent Orders",
+            key=PKU_REAGENT_SOURCE_KEY,
+            name=PKU_REAGENT_SOURCE_NAME,
             enabled=True,
             authenticator=StubAuthenticator(),
             client=StubClient(),
@@ -59,8 +61,10 @@ class PkuReagentSourceTestCase(unittest.TestCase):
         result = source.fetch()
 
         self.assertIsInstance(result, SourceFetchResult)
-        self.assertEqual(result.source_key, "pku_reagent_orders")
+        self.assertEqual(result.source_key, PKU_REAGENT_SOURCE_KEY)
+        self.assertEqual(result.source_name, PKU_REAGENT_SOURCE_NAME)
         self.assertEqual(len(result.items), 1)
+        self.assertEqual(result.items[0].source_name, PKU_REAGENT_SOURCE_NAME)
         self.assertEqual(result.items[0].metadata["status"], "供货商配送中")
 
 
