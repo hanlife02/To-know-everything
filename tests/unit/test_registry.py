@@ -23,6 +23,14 @@ class SourceRegistryTestCase(unittest.TestCase):
         self.assertEqual(len(enabled), 1)
         self.assertEqual(enabled[0].key, "stub")
 
+    def test_registry_returns_no_sources_when_allowed_keys_is_empty_tuple(self) -> None:
+        registry = SourceRegistry()
+        registry.register(StubSource())
+
+        enabled = registry.enabled(())
+
+        self.assertEqual(enabled, [])
+
 
 if __name__ == "__main__":
     unittest.main()

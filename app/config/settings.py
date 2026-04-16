@@ -20,6 +20,19 @@ def _parse_csv(value: str | None) -> tuple[str, ...]:
     return tuple(part.strip() for part in value.split(",") if part.strip())
 
 
+def _parse_enabled_sources_from_env() -> tuple[tuple[str, ...], bool]:
+    source_toggles = {
+        "pku_reagent_orders": os.getenv("SOURCE_PKU_REAGENT_ORDERS_ENABLED"),
+    }
+    if any(value is not None for value in source_toggles.values()):
+        enabled = tuple(key for key, value in source_toggles.items() if _parse_bool(value))
+        return enabled, True
+    legacy_enabled_sources = os.getenv("ENABLED_SOURCES")
+    if legacy_enabled_sources is not None:
+        return _parse_csv(legacy_enabled_sources), True
+    return (), False
+
+
 @dataclass(frozen=True, slots=True)
 class TelegramSettings:
     enabled: bool = False
@@ -88,6 +101,7 @@ class AppSettings:
     pku_reagent: PkuReagentSettings = field(default_factory=PkuReagentSettings)
     web_api_key: str | None = None
     enabled_sources: tuple[str, ...] = field(default_factory=tuple)
+    source_filter_configured: bool = False
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -98,20 +112,15 @@ class AppSettings:
         pku_reagent_password = os.getenv("PKU_REAGENT_PASSWORD")
         pku_reagent_token = os.getenv("PKU_REAGENT_TOKEN")
         pku_reagent_cookie = os.getenv("PKU_REAGENT_COOKIE")
-        telegram_enabled_default = bool(telegram_bot_token and telegram_chat_id)
-        bark_enabled_default = bool(bark_key)
-        pku_reagent_enabled_default = bool(
-            (pku_reagent_username and pku_reagent_password)
-            or (pku_reagent_username and pku_reagent_token and pku_reagent_cookie)
-        )
+        enabled_sources, source_filter_configured = _parse_enabled_sources_from_env()
         telegram = TelegramSettings(
-            enabled=_parse_bool(os.getenv("TELEGRAM_ENABLED"), default=telegram_enabled_default),
+            enabled=_parse_bool(os.getenv("TELEGRAM_ENABLED")),
             bot_token=telegram_bot_token,
             chat_id=telegram_chat_id,
             disable_web_page_preview=_parse_bool(os.getenv("TELEGRAM_DISABLE_WEB_PAGE_PREVIEW"), default=True),
         )
         bark = BarkSettings(
-            enabled=_parse_bool(os.getenv("BARK_ENABLED"), default=bark_enabled_default),
+            enabled=_parse_bool(os.getenv("BARK_ENABLED")),
             server_url=os.getenv("BARK_SERVER_URL", "https://api.day.app"),
             key=bark_key,
             group=os.getenv("BARK_GROUP"),
@@ -123,7 +132,7 @@ class AppSettings:
             default_mode=automation_mode,
         )
         pku_reagent = PkuReagentSettings(
-            enabled=_parse_bool(os.getenv("PKU_REAGENT_ENABLED"), default=pku_reagent_enabled_default),
+            enabled=_parse_bool(os.getenv("PKU_REAGENT_ENABLED")),
             base_url=os.getenv("PKU_REAGENT_BASE_URL", "https://reagent.pku.edu.cn"),
             iaaa_base_url=os.getenv("PKU_REAGENT_IAAA_BASE_URL", "https://iaaa.pku.edu.cn/iaaa"),
             username=pku_reagent_username,
@@ -148,7 +157,8 @@ class AppSettings:
             automation=automation,
             pku_reagent=pku_reagent,
             web_api_key=os.getenv("WEB_API_KEY"),
-            enabled_sources=_parse_csv(os.getenv("ENABLED_SOURCES")),
+            enabled_sources=enabled_sources,
+            source_filter_configured=source_filter_configured,
         )
 
     def enabled_channels(self) -> tuple[NotificationChannel, ...]:

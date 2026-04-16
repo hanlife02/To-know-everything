@@ -18,7 +18,8 @@ class PipelineDispatcher:
         self._report_generator = report_generator
 
     def run(self, mode: DeliveryMode) -> PipelineResult:
-        source_results = refresh_sources(self._registry, self._settings.enabled_sources)
+        enabled_sources = self._settings.enabled_sources if self._settings.source_filter_configured else None
+        source_results = refresh_sources(self._registry, enabled_sources)
         items: list[ContentItem] = []
         for result in source_results:
             items.extend(result.items)
@@ -44,4 +45,3 @@ class PipelineDispatcher:
                     )
                 )
         return PipelineResult(mode=mode, items=items, messages=messages, source_results=source_results)
-

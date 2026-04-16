@@ -16,8 +16,8 @@ class SourceRegistry:
     def all(self) -> list[SourceAdapter]:
         return list(self._sources.values())
 
-    def enabled(self, allowed_keys: tuple[str, ...] = ()) -> list[SourceAdapter]:
-        if not allowed_keys:
+    def enabled(self, allowed_keys: tuple[str, ...] | None = None) -> list[SourceAdapter]:
+        if allowed_keys is None:
             return [source for source in self._sources.values() if source.enabled]
         allowed = set(allowed_keys)
         return [source for source in self._sources.values() if source.enabled and source.key in allowed]

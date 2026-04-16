@@ -6,7 +6,7 @@ from app.config.settings import AppSettings
 
 
 class SettingsTestCase(unittest.TestCase):
-    def test_telegram_auto_enables_with_bot_token_and_chat_id(self) -> None:
+    def test_telegram_stays_disabled_without_explicit_flag(self) -> None:
         with patch.dict(
             os.environ,
             {
@@ -17,13 +17,44 @@ class SettingsTestCase(unittest.TestCase):
         ):
             settings = AppSettings.from_env()
 
-        self.assertTrue(settings.telegram.enabled)
-        self.assertTrue(settings.telegram.is_configured())
+        self.assertFalse(settings.telegram.enabled)
+        self.assertFalse(settings.telegram.is_configured())
 
-    def test_bark_auto_enables_with_key(self) -> None:
+    def test_telegram_can_be_explicitly_enabled(self) -> None:
         with patch.dict(
             os.environ,
             {
+                "TELEGRAM_ENABLED": "true",
+                "TELEGRAM_BOT_TOKEN": "token",
+                "TELEGRAM_CHAT_ID": "chat-id",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertTrue(settings.telegram.enabled)
+        self.assertTrue(settings.telegram.is_configured())
+
+    def test_bark_stays_disabled_without_explicit_flag(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "BARK_KEY": "bark-key",
+                "BARK_GROUP": "lab-orders",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertFalse(settings.bark.enabled)
+        self.assertFalse(settings.bark.is_configured())
+        self.assertEqual(settings.bark.group, "lab-orders")
+
+    def test_bark_can_be_explicitly_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "BARK_ENABLED": "true",
                 "BARK_KEY": "bark-key",
                 "BARK_GROUP": "lab-orders",
             },
@@ -35,10 +66,25 @@ class SettingsTestCase(unittest.TestCase):
         self.assertTrue(settings.bark.is_configured())
         self.assertEqual(settings.bark.group, "lab-orders")
 
-    def test_pku_reagent_auto_enables_with_username_and_password(self) -> None:
+    def test_pku_reagent_stays_disabled_without_explicit_flag(self) -> None:
         with patch.dict(
             os.environ,
             {
+                "PKU_REAGENT_USERNAME": "CG17288",
+                "PKU_REAGENT_PASSWORD": "secret",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertFalse(settings.pku_reagent.enabled)
+        self.assertTrue(settings.pku_reagent.has_login_credentials())
+
+    def test_pku_reagent_can_be_explicitly_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "PKU_REAGENT_ENABLED": "true",
                 "PKU_REAGENT_USERNAME": "CG17288",
                 "PKU_REAGENT_PASSWORD": "secret",
             },
@@ -62,6 +108,45 @@ class SettingsTestCase(unittest.TestCase):
             settings = AppSettings.from_env()
 
         self.assertFalse(settings.pku_reagent.enabled)
+
+    def test_source_filter_stays_unconfigured_without_explicit_flag(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SOURCE_PKU_REAGENT_ORDERS_ENABLED": "",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertEqual(settings.enabled_sources, ())
+        self.assertTrue(settings.source_filter_configured)
+
+    def test_source_filter_can_enable_pku_reagent_orders(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SOURCE_PKU_REAGENT_ORDERS_ENABLED": "true",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertEqual(settings.enabled_sources, ("pku_reagent_orders",))
+        self.assertTrue(settings.source_filter_configured)
+
+    def test_legacy_enabled_sources_is_still_supported(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "ENABLED_SOURCES": "pku_reagent_orders",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertEqual(settings.enabled_sources, ("pku_reagent_orders",))
+        self.assertTrue(settings.source_filter_configured)
 
 
 if __name__ == "__main__":
