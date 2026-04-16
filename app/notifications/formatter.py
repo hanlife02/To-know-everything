@@ -6,21 +6,24 @@ from app.domain.models import ContentItem
 
 def build_summary_body(items: list[ContentItem]) -> str:
     sections = [_build_item_section(item) for item in items]
-    return "\n\n".join(section for section in sections if section).strip()
+    return "\n".join(section for section in sections if section).strip()
 
 
 def _build_item_section(item: ContentItem) -> str:
-    lines = [f"title: {item.title}"]
+    parts = [item.title]
     status = item.metadata.get("status")
     sku = item.metadata.get("sku")
-    order_time = item.metadata.get("order_time")
+    display_time = item.metadata.get("time") or item.metadata.get("order_time")
+    include_url = item.metadata.get("include_url") == "true"
     if status:
-        lines.append(f"status: {status}")
+        parts.append(status)
     if sku:
-        lines.append(f"sku: {sku}")
-    if order_time:
-        lines.append(f"time: {order_time}")
-    return "\n".join(lines)
+        parts.append(sku)
+    if display_time:
+        parts.append(display_time)
+    if include_url and item.url:
+        parts.append(item.url)
+    return " | ".join(part for part in parts if part)
 
 
 def split_message(body: str, max_length: int = DEFAULT_MESSAGE_CHUNK_SIZE) -> list[str]:

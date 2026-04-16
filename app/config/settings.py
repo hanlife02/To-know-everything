@@ -22,6 +22,7 @@ def _parse_csv(value: str | None) -> tuple[str, ...]:
 
 def _parse_enabled_sources_from_env() -> tuple[tuple[str, ...], bool]:
     source_toggles = {
+        "mse_notices": os.getenv("SOURCE_MSE_NOTICES_ENABLED"),
         "pku_reagent_orders": os.getenv("SOURCE_PKU_REAGENT_ORDERS_ENABLED"),
     }
     if any(value is not None for value in source_toggles.values()):

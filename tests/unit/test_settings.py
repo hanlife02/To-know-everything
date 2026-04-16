@@ -135,6 +135,20 @@ class SettingsTestCase(unittest.TestCase):
         self.assertEqual(settings.enabled_sources, ("pku_reagent_orders",))
         self.assertTrue(settings.source_filter_configured)
 
+    def test_source_filter_can_enable_multiple_sources(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SOURCE_MSE_NOTICES_ENABLED": "true",
+                "SOURCE_PKU_REAGENT_ORDERS_ENABLED": "true",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertEqual(settings.enabled_sources, ("mse_notices", "pku_reagent_orders"))
+        self.assertTrue(settings.source_filter_configured)
+
     def test_legacy_enabled_sources_is_still_supported(self) -> None:
         with patch.dict(
             os.environ,

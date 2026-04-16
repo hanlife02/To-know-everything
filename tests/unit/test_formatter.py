@@ -6,7 +6,7 @@ from app.notifications.formatter import split_message
 
 
 class FormatterTestCase(unittest.TestCase):
-    def test_build_summary_body_only_contains_title_status_sku_and_time(self) -> None:
+    def test_build_summary_body_formats_each_item_on_one_line_without_field_labels(self) -> None:
         body = build_summary_body(
             [
                 ContentItem(
@@ -26,14 +26,29 @@ class FormatterTestCase(unittest.TestCase):
 
         self.assertEqual(
             body,
-            "\n".join(
-                [
-                    "title: Order ready",
-                    "status: 平台配送中",
-                    "sku: HBZSX0952 / 40ml",
-                    "time: 2026-04-14 15:08:09",
-                ]
-            ),
+            "Order ready | 平台配送中 | HBZSX0952 / 40ml | 2026-04-14 15:08:09",
+        )
+
+    def test_build_summary_body_includes_url_when_source_requests_it(self) -> None:
+        body = build_summary_body(
+            [
+                ContentItem(
+                    source_key="mse_notices",
+                    source_name="材料学院通知",
+                    title="关于调整研究生毕（结）业和学位授予批次的通知",
+                    url="https://www.mse.pku.edu.cn/info/1013/5774.htm",
+                    summary="",
+                    metadata={
+                        "time": "2026年04月16日",
+                        "include_url": "true",
+                    },
+                )
+            ]
+        )
+
+        self.assertEqual(
+            body,
+            "关于调整研究生毕（结）业和学位授予批次的通知 | 2026年04月16日 | https://www.mse.pku.edu.cn/info/1013/5774.htm",
         )
 
     def test_split_message_respects_limit(self) -> None:
