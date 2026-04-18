@@ -5,19 +5,13 @@ from datetime import UTC, datetime
 
 
 @dataclass(frozen=True, slots=True)
-class XUser:
-    id: str
-    username: str
-    name: str = ""
-
-
-@dataclass(frozen=True, slots=True)
 class XPost:
     id: str
     author_id: str
     username: str
     text: str
     created_at: datetime | None = None
+    url: str = ""
 
 
 def parse_x_created_at(value: str | None) -> datetime | None:

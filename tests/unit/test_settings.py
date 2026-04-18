@@ -113,7 +113,7 @@ class SettingsTestCase(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "X_BEARER_TOKEN": "token",
+                "X_COOKIE_HEADER": "auth_token=test; ct0=csrf",
                 "X_USERNAMES": "OpenAI,sama",
             },
             clear=True,
@@ -129,7 +129,8 @@ class SettingsTestCase(unittest.TestCase):
             os.environ,
             {
                 "X_ENABLED": "true",
-                "X_BEARER_TOKEN": "token",
+                "X_COOKIE_HEADER": "auth_token=test; ct0=csrf",
+                "X_BASE_URL": "https://x.com",
                 "X_USERNAMES": "OpenAI,AnthropicAI,sama",
                 "X_MAX_RESULTS_PER_USER": "2",
                 "X_EXCLUDE_REPLIES": "false",
@@ -144,6 +145,7 @@ class SettingsTestCase(unittest.TestCase):
         self.assertEqual(settings.x.max_results_per_user, 5)
         self.assertFalse(settings.x.exclude_replies)
         self.assertTrue(settings.x.exclude_retweets)
+        self.assertEqual(settings.x.base_url, "https://x.com")
 
     def test_source_filter_stays_unconfigured_without_explicit_flag(self) -> None:
         with patch.dict(

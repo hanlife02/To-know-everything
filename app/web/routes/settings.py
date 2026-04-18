@@ -15,6 +15,7 @@ def get_settings_payload(context: AppContext) -> dict[str, object]:
             "enabled": context.settings.x.enabled,
             "configured": context.settings.x.is_configured(),
             "usernames": list(context.settings.x.usernames),
+            "base_url": context.settings.x.base_url,
             "max_results_per_user": context.settings.x.max_results_per_user,
             "exclude_replies": context.settings.x.exclude_replies,
             "exclude_retweets": context.settings.x.exclude_retweets,

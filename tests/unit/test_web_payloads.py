@@ -15,7 +15,8 @@ class WebPayloadsTestCase(unittest.TestCase):
                 {
                     "APP_DATA_DIR": tmpdir,
                     "X_ENABLED": "true",
-                    "X_BEARER_TOKEN": "token",
+                    "X_COOKIE_HEADER": "auth_token=test; ct0=csrf",
+                    "X_BASE_URL": "https://x.com",
                     "X_USERNAMES": "OpenAI,AnthropicAI,sama",
                     "X_MAX_RESULTS_PER_USER": "7",
                     "X_EXCLUDE_REPLIES": "false",
@@ -35,6 +36,7 @@ class WebPayloadsTestCase(unittest.TestCase):
                 "enabled": True,
                 "configured": True,
                 "usernames": ["OpenAI", "AnthropicAI", "sama"],
+                "base_url": "https://x.com",
                 "max_results_per_user": 7,
                 "exclude_replies": False,
                 "exclude_retweets": True,

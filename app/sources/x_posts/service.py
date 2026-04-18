@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from app.config.settings import XSettings
 from app.domain.models import ContentItem, SourceFetchResult
 from app.sources.base import SourceAdapter
-from app.sources.x_posts.client import HttpXPostsClient, XPostsClient
+from app.sources.x_posts.client import WebSessionXPostsClient, XPostsClient
 from app.sources.x_posts.models import XPost
 
 X_POSTS_SOURCE_KEY = "x_posts"
@@ -42,10 +42,10 @@ class XPostsSource(SourceAdapter):
     @classmethod
     def from_settings(cls, settings: XSettings) -> "XPostsSource":
         client: XPostsClient | None = None
-        if settings.bearer_token:
-            client = HttpXPostsClient(
-                bearer_token=settings.bearer_token,
-                api_base_url=settings.api_base_url,
+        if settings.cookie_header:
+            client = WebSessionXPostsClient(
+                cookie_header=settings.cookie_header,
+                base_url=settings.base_url,
             )
         return cls(
             enabled=settings.enabled,
@@ -62,11 +62,8 @@ class XPostsSource(SourceAdapter):
         items: list[ContentItem] = []
         try:
             for username in self.usernames:
-                user = self.client.lookup_user_by_username(username)
-                if user is None:
-                    continue
-                posts = self.client.fetch_user_posts(
-                    user,
+                posts = self.client.fetch_posts(
+                    username,
                     max_results=self.max_results_per_user,
                     exclude_replies=self.exclude_replies,
                     exclude_retweets=self.exclude_retweets,
@@ -88,7 +85,7 @@ class XPostsSource(SourceAdapter):
         display_time = ""
         if post.created_at is not None:
             display_time = post.created_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-        url = f"https://x.com/{post.username}/status/{post.id}"
+        url = post.url or f"https://x.com/{post.username}/status/{post.id}"
         return ContentItem(
             source_key=self.key,
             source_name=self.name,

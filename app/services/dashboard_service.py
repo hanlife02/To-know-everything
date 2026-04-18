@@ -28,6 +28,7 @@ class DashboardService:
                 "enabled": self._settings.x.enabled,
                 "configured": self._settings.x.is_configured(),
                 "usernames": list(self._settings.x.usernames),
+                "base_url": self._settings.x.base_url,
                 "max_results_per_user": self._settings.x.max_results_per_user,
                 "exclude_replies": self._settings.x.exclude_replies,
                 "exclude_retweets": self._settings.x.exclude_retweets,

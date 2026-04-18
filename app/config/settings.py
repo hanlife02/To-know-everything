@@ -111,15 +111,15 @@ DEFAULT_X_USERNAMES = ("OpenAI", "AnthropicAI", "GeminiApp", "sama", "elonmusk")
 @dataclass(frozen=True, slots=True)
 class XSettings:
     enabled: bool = False
-    bearer_token: str | None = None
+    cookie_header: str | None = None
+    base_url: str = "https://x.com"
     usernames: tuple[str, ...] = DEFAULT_X_USERNAMES
-    api_base_url: str = "https://api.x.com"
     max_results_per_user: int = 5
     exclude_replies: bool = True
     exclude_retweets: bool = True
 
     def is_configured(self) -> bool:
-        return self.enabled and bool(self.bearer_token and self.usernames)
+        return self.enabled and bool(self.usernames and self.cookie_header)
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,9 +184,9 @@ class AppSettings:
         )
         x = XSettings(
             enabled=_parse_bool(os.getenv("X_ENABLED")),
-            bearer_token=os.getenv("X_BEARER_TOKEN"),
+            cookie_header=os.getenv("X_COOKIE_HEADER"),
+            base_url=os.getenv("X_BASE_URL", "https://x.com"),
             usernames=x_usernames,
-            api_base_url=os.getenv("X_API_BASE_URL", "https://api.x.com"),
             max_results_per_user=_clamp(_parse_int(os.getenv("X_MAX_RESULTS_PER_USER"), 5), 5, 100),
             exclude_replies=_parse_bool(os.getenv("X_EXCLUDE_REPLIES"), default=True),
             exclude_retweets=_parse_bool(os.getenv("X_EXCLUDE_RETWEETS"), default=True),
