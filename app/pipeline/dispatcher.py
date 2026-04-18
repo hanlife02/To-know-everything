@@ -7,7 +7,7 @@ from app.llm.report_generator import ReportGenerator
 from app.pipeline.digest import build_digest_messages
 from app.pipeline.filters import deduplicate_items, filter_recent_items
 from app.pipeline.refresh import refresh_sources
-from app.pipeline.report import build_report_message
+from app.pipeline.report import build_report_messages
 from app.sources.registry import SourceRegistry
 from app.storage.cache_store import CacheStore
 
@@ -36,8 +36,8 @@ class PipelineDispatcher:
         targets = self._settings.enabled_channels()
         if items and targets:
             if mode is DeliveryMode.REPORT:
-                messages.append(
-                    build_report_message(
+                messages.extend(
+                    build_report_messages(
                         items=items,
                         report_generator=self._report_generator,
                         targets=targets,

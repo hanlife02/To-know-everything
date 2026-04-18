@@ -51,7 +51,7 @@ class FormatterTestCase(unittest.TestCase):
             "关于调整研究生毕（结）业和学位授予批次的通知 | 2026年04月16日 | https://www.mse.pku.edu.cn/info/1013/5774.htm",
         )
 
-    def test_build_summary_body_includes_x_post_content(self) -> None:
+    def test_build_summary_body_formats_x_post_with_author_time_and_url(self) -> None:
         body = build_summary_body(
             [
                 ContentItem(
@@ -71,7 +71,7 @@ class FormatterTestCase(unittest.TestCase):
 
         self.assertEqual(
             body,
-            "@OpenAI | New launch details | 2026-04-18 10:30:00 UTC | https://x.com/OpenAI/status/123",
+            "@OpenAI | 2026-04-18 10:30:00 UTC | https://x.com/OpenAI/status/123",
         )
 
     def test_split_message_respects_limit(self) -> None:

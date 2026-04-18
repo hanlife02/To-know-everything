@@ -10,6 +10,8 @@ def build_summary_body(items: list[ContentItem]) -> str:
 
 
 def _build_item_section(item: ContentItem) -> str:
+    if item.source_key == "x_posts":
+        return _build_x_post_section(item)
     parts = [item.title]
     content = item.metadata.get("content")
     status = item.metadata.get("status")
@@ -22,6 +24,17 @@ def _build_item_section(item: ContentItem) -> str:
         parts.append(status)
     if sku:
         parts.append(sku)
+    if display_time:
+        parts.append(display_time)
+    if include_url and item.url:
+        parts.append(item.url)
+    return " | ".join(part for part in parts if part)
+
+
+def _build_x_post_section(item: ContentItem) -> str:
+    parts = [item.title]
+    display_time = item.metadata.get("time") or item.metadata.get("order_time")
+    include_url = item.metadata.get("include_url") == "true"
     if display_time:
         parts.append(display_time)
     if include_url and item.url:
