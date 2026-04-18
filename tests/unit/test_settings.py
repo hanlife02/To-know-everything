@@ -109,6 +109,42 @@ class SettingsTestCase(unittest.TestCase):
 
         self.assertFalse(settings.pku_reagent.enabled)
 
+    def test_x_stays_disabled_without_explicit_flag(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "X_BEARER_TOKEN": "token",
+                "X_USERNAMES": "OpenAI,sama",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertFalse(settings.x.enabled)
+        self.assertFalse(settings.x.is_configured())
+        self.assertEqual(settings.x.usernames, ("OpenAI", "sama"))
+
+    def test_x_can_be_explicitly_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "X_ENABLED": "true",
+                "X_BEARER_TOKEN": "token",
+                "X_USERNAMES": "OpenAI,AnthropicAI,sama",
+                "X_MAX_RESULTS_PER_USER": "2",
+                "X_EXCLUDE_REPLIES": "false",
+            },
+            clear=True,
+        ):
+            settings = AppSettings.from_env()
+
+        self.assertTrue(settings.x.enabled)
+        self.assertTrue(settings.x.is_configured())
+        self.assertEqual(settings.x.usernames, ("OpenAI", "AnthropicAI", "sama"))
+        self.assertEqual(settings.x.max_results_per_user, 5)
+        self.assertFalse(settings.x.exclude_replies)
+        self.assertTrue(settings.x.exclude_retweets)
+
     def test_source_filter_stays_unconfigured_without_explicit_flag(self) -> None:
         with patch.dict(
             os.environ,
@@ -141,12 +177,13 @@ class SettingsTestCase(unittest.TestCase):
             {
                 "SOURCE_MSE_NOTICES_ENABLED": "true",
                 "SOURCE_PKU_REAGENT_ORDERS_ENABLED": "true",
+                "SOURCE_X_POSTS_ENABLED": "true",
             },
             clear=True,
         ):
             settings = AppSettings.from_env()
 
-        self.assertEqual(settings.enabled_sources, ("mse_notices", "pku_reagent_orders"))
+        self.assertEqual(settings.enabled_sources, ("mse_notices", "pku_reagent_orders", "x_posts"))
         self.assertTrue(settings.source_filter_configured)
 
     def test_legacy_enabled_sources_is_still_supported(self) -> None:

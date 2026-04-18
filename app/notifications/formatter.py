@@ -11,10 +11,13 @@ def build_summary_body(items: list[ContentItem]) -> str:
 
 def _build_item_section(item: ContentItem) -> str:
     parts = [item.title]
+    content = item.metadata.get("content")
     status = item.metadata.get("status")
     sku = item.metadata.get("sku")
     display_time = item.metadata.get("time") or item.metadata.get("order_time")
     include_url = item.metadata.get("include_url") == "true"
+    if content:
+        parts.append(content)
     if status:
         parts.append(status)
     if sku:

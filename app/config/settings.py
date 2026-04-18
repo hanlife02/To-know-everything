@@ -20,10 +20,24 @@ def _parse_csv(value: str | None) -> tuple[str, ...]:
     return tuple(part.strip() for part in value.split(",") if part.strip())
 
 
+def _parse_int(value: str | None, default: int) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _clamp(value: int, minimum: int, maximum: int) -> int:
+    return max(minimum, min(value, maximum))
+
+
 def _parse_enabled_sources_from_env() -> tuple[tuple[str, ...], bool]:
     source_toggles = {
         "mse_notices": os.getenv("SOURCE_MSE_NOTICES_ENABLED"),
         "pku_reagent_orders": os.getenv("SOURCE_PKU_REAGENT_ORDERS_ENABLED"),
+        "x_posts": os.getenv("SOURCE_X_POSTS_ENABLED"),
     }
     if any(value is not None for value in source_toggles.values()):
         enabled = tuple(key for key, value in source_toggles.items() if _parse_bool(value))
@@ -91,6 +105,23 @@ class PkuReagentSettings:
         return self.enabled and (self.has_static_session() or self.has_login_credentials())
 
 
+DEFAULT_X_USERNAMES = ("OpenAI", "AnthropicAI", "GeminiApp", "sama", "elonmusk")
+
+
+@dataclass(frozen=True, slots=True)
+class XSettings:
+    enabled: bool = False
+    bearer_token: str | None = None
+    usernames: tuple[str, ...] = DEFAULT_X_USERNAMES
+    api_base_url: str = "https://api.x.com"
+    max_results_per_user: int = 5
+    exclude_replies: bool = True
+    exclude_retweets: bool = True
+
+    def is_configured(self) -> bool:
+        return self.enabled and bool(self.bearer_token and self.usernames)
+
+
 @dataclass(frozen=True, slots=True)
 class AppSettings:
     env: str = "development"
@@ -100,6 +131,7 @@ class AppSettings:
     bark: BarkSettings = field(default_factory=BarkSettings)
     automation: AutomationSettings = field(default_factory=AutomationSettings)
     pku_reagent: PkuReagentSettings = field(default_factory=PkuReagentSettings)
+    x: XSettings = field(default_factory=XSettings)
     web_api_key: str | None = None
     enabled_sources: tuple[str, ...] = field(default_factory=tuple)
     source_filter_configured: bool = False
@@ -113,6 +145,7 @@ class AppSettings:
         pku_reagent_password = os.getenv("PKU_REAGENT_PASSWORD")
         pku_reagent_token = os.getenv("PKU_REAGENT_TOKEN")
         pku_reagent_cookie = os.getenv("PKU_REAGENT_COOKIE")
+        x_usernames = _parse_csv(os.getenv("X_USERNAMES")) or DEFAULT_X_USERNAMES
         enabled_sources, source_filter_configured = _parse_enabled_sources_from_env()
         telegram = TelegramSettings(
             enabled=_parse_bool(os.getenv("TELEGRAM_ENABLED")),
@@ -149,6 +182,15 @@ class AppSettings:
             group_code=os.getenv("PKU_REAGENT_GROUP_CODE", ""),
             page_size=int(os.getenv("PKU_REAGENT_PAGE_SIZE", "20")),
         )
+        x = XSettings(
+            enabled=_parse_bool(os.getenv("X_ENABLED")),
+            bearer_token=os.getenv("X_BEARER_TOKEN"),
+            usernames=x_usernames,
+            api_base_url=os.getenv("X_API_BASE_URL", "https://api.x.com"),
+            max_results_per_user=_clamp(_parse_int(os.getenv("X_MAX_RESULTS_PER_USER"), 5), 5, 100),
+            exclude_replies=_parse_bool(os.getenv("X_EXCLUDE_REPLIES"), default=True),
+            exclude_retweets=_parse_bool(os.getenv("X_EXCLUDE_RETWEETS"), default=True),
+        )
         return cls(
             env=os.getenv("APP_ENV", "development"),
             log_level=os.getenv("APP_LOG_LEVEL", "INFO"),
@@ -157,6 +199,7 @@ class AppSettings:
             bark=bark,
             automation=automation,
             pku_reagent=pku_reagent,
+            x=x,
             web_api_key=os.getenv("WEB_API_KEY"),
             enabled_sources=enabled_sources,
             source_filter_configured=source_filter_configured,

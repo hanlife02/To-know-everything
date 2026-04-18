@@ -51,6 +51,29 @@ class FormatterTestCase(unittest.TestCase):
             "关于调整研究生毕（结）业和学位授予批次的通知 | 2026年04月16日 | https://www.mse.pku.edu.cn/info/1013/5774.htm",
         )
 
+    def test_build_summary_body_includes_x_post_content(self) -> None:
+        body = build_summary_body(
+            [
+                ContentItem(
+                    source_key="x_posts",
+                    source_name="X 关注",
+                    title="@OpenAI",
+                    url="https://x.com/OpenAI/status/123",
+                    summary="",
+                    metadata={
+                        "content": "New launch details",
+                        "time": "2026-04-18 10:30:00 UTC",
+                        "include_url": "true",
+                    },
+                )
+            ]
+        )
+
+        self.assertEqual(
+            body,
+            "@OpenAI | New launch details | 2026-04-18 10:30:00 UTC | https://x.com/OpenAI/status/123",
+        )
+
     def test_split_message_respects_limit(self) -> None:
         body = "line-1\nline-2\nline-3\n"
 
