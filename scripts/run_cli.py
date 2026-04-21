@@ -163,6 +163,13 @@ def run_config_wizard(controller: AppController, *, pretty: bool) -> int:
 
     print("Saved runtime overrides:")
     print_json(redact_sensitive_values(payload), pretty=pretty)
+    if not _prompt_bool("Run a delivery job now", default=True):
+        return 0
+
+    mode = DeliveryMode.from_value(payload["automation"]["default_mode"])
+    print(f"Running delivery job in {mode.value} mode...")
+    result = run_delivery_job(controller.get_context(), mode)
+    print_json(result.as_dict(), pretty=pretty)
     return 0
 
 

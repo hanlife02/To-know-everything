@@ -124,6 +124,7 @@ class CliCommandTestCase(unittest.TestCase):
                         "y",
                         "n",
                         "n",
+                        "",
                     ],
                 ), patch(
                     "scripts.run_cli.getpass",
@@ -132,11 +133,15 @@ class CliCommandTestCase(unittest.TestCase):
                         "x-cookie=value",
                         "web-api-key",
                     ],
-                ):
+                ), patch(
+                    "scripts.run_cli.run_delivery_job",
+                ) as run_delivery_job_mock:
+                    run_delivery_job_mock.return_value.as_dict.return_value = {"status": "ok"}
                     buffer = io.StringIO()
                     with redirect_stdout(buffer):
                         exit_code = main([])
                     self.assertEqual(exit_code, 0)
+                    run_delivery_job_mock.assert_called_once()
 
                 runtime_config_path = os.path.join(tmpdir, "settings", "runtime_settings.json")
                 with open(runtime_config_path, encoding="utf-8") as handle:
@@ -168,6 +173,37 @@ class CliCommandTestCase(unittest.TestCase):
                 self.assertEqual(raw_payload["x"]["cookie_header"], "x-cookie=value")
                 self.assertFalse(raw_payload["pku_reagent"]["enabled"])
                 self.assertEqual(raw_payload["web_api_key"], "web-api-key")
+
+    def test_wizard_can_save_without_running_delivery_job(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env = {
+                "APP_DATA_DIR": tmpdir,
+                "AUTOMATION_ENABLED": "false",
+                "AUTOMATION_DAILY_TIME": "09:00",
+                "AUTOMATION_DEFAULT_MODE": "summary",
+                "SOURCE_MSE_NOTICES_ENABLED": "false",
+                "SOURCE_PKU_REAGENT_ORDERS_ENABLED": "false",
+                "SOURCE_X_POSTS_ENABLED": "false",
+                "TELEGRAM_ENABLED": "false",
+                "BARK_ENABLED": "false",
+                "PKU_REAGENT_ENABLED": "false",
+                "X_ENABLED": "false",
+            }
+            with patch.dict(os.environ, env, clear=True):
+                with patch(
+                    "builtins.input",
+                    side_effect=[""] * 10 + ["n"],
+                ), patch(
+                    "scripts.run_cli.getpass",
+                    side_effect=["", "", ""],
+                ), patch(
+                    "scripts.run_cli.run_delivery_job",
+                ) as run_delivery_job_mock:
+                    buffer = io.StringIO()
+                    with redirect_stdout(buffer):
+                        exit_code = main([])
+                    self.assertEqual(exit_code, 0)
+                    run_delivery_job_mock.assert_not_called()
 
     def test_wizard_uses_env_defaults_when_user_presses_enter(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -205,11 +241,15 @@ class CliCommandTestCase(unittest.TestCase):
                 ), patch(
                     "scripts.run_cli.getpass",
                     side_effect=["", "", ""],
-                ):
+                ), patch(
+                    "scripts.run_cli.run_delivery_job",
+                ) as run_delivery_job_mock:
+                    run_delivery_job_mock.return_value.as_dict.return_value = {"status": "ok"}
                     buffer = io.StringIO()
                     with redirect_stdout(buffer):
                         exit_code = main([])
                     self.assertEqual(exit_code, 0)
+                    run_delivery_job_mock.assert_called_once()
 
                 runtime_config_path = os.path.join(tmpdir, "settings", "runtime_settings.json")
                 with open(runtime_config_path, encoding="utf-8") as handle:
