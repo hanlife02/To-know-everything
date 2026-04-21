@@ -14,7 +14,7 @@ ensure_project_root_on_path()
 load_dotenv()
 
 from app.automation.jobs import run_delivery_job
-from app.bootstrap import create_app_context
+from app.bootstrap import AppController
 from app.domain.enums import DeliveryMode
 
 
@@ -22,7 +22,8 @@ def main() -> int:
     mode = DeliveryMode.SUMMARY
     if len(sys.argv) > 1:
         mode = DeliveryMode.from_value(sys.argv[1])
-    context = create_app_context()
+    controller = AppController()
+    context = controller.get_context()
     result = run_delivery_job(context, mode)
     print(json.dumps(result.as_dict(), ensure_ascii=False, indent=2))
     return 0

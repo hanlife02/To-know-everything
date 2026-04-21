@@ -13,17 +13,19 @@ ensure_project_root_on_path()
 load_dotenv()
 
 from app.automation.scheduler import DailyScheduler
-from app.bootstrap import create_app_context
+from app.bootstrap import AppController
 
 
 def main() -> int:
-    context = create_app_context()
-    scheduler = DailyScheduler(context)
+    controller = AppController()
+    context = controller.get_context()
+    scheduler = DailyScheduler(controller.get_context)
     print(
         "scheduler started: "
         f"enabled={context.settings.automation.enabled}, "
         f"time={context.settings.automation.daily_time}, "
-        f"mode={context.settings.automation.default_mode.value}"
+        f"mode={context.settings.automation.default_mode.value}, "
+        f"settings={controller.settings_store_path}"
     )
     scheduler.run_forever()
     return 0

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from time import sleep
+from typing import Callable
 
 from app.bootstrap import AppContext
 from app.automation.jobs import run_delivery_job
@@ -10,30 +11,32 @@ from app.automation.jobs import run_delivery_job
 
 @dataclass(slots=True)
 class DailyScheduler:
-    context: AppContext
+    context: AppContext | Callable[[], AppContext]
 
     def run_pending(self, now: datetime | None = None) -> bool:
-        if not self.is_due(now):
+        context = self._current_context()
+        if not self.is_due(now, context=context):
             return False
-        run_delivery_job(self.context, self.context.settings.automation.default_mode)
+        run_delivery_job(context, context.settings.automation.default_mode)
         return True
 
-    def is_due(self, now: datetime | None = None) -> bool:
-        if not self.context.settings.automation.enabled:
+    def is_due(self, now: datetime | None = None, context: AppContext | None = None) -> bool:
+        active_context = context or self._current_context()
+        if not active_context.settings.automation.enabled:
             return False
         current = (now or datetime.now().astimezone()).astimezone()
-        scheduled_at = self._scheduled_datetime_for_day(current)
+        scheduled_at = self._scheduled_datetime_for_day(current, active_context=active_context)
         if current < scheduled_at:
             return False
-        return not self._has_run_since(scheduled_at)
+        return not self._has_run_since(scheduled_at, active_context=active_context)
 
     def run_forever(self, poll_interval_seconds: int = 30) -> None:
         while True:
             self.run_pending()
             sleep(poll_interval_seconds)
 
-    def _scheduled_datetime_for_day(self, now: datetime) -> datetime:
-        scheduled_time = _parse_daily_time(self.context.settings.automation.daily_time)
+    def _scheduled_datetime_for_day(self, now: datetime, *, active_context: AppContext) -> datetime:
+        scheduled_time = _parse_daily_time(active_context.settings.automation.daily_time)
         return now.replace(
             hour=scheduled_time.hour,
             minute=scheduled_time.minute,
@@ -41,8 +44,8 @@ class DailyScheduler:
             microsecond=0,
         )
 
-    def _has_run_since(self, threshold: datetime) -> bool:
-        for run in reversed(self.context.state_store.get_run_history()):
+    def _has_run_since(self, threshold: datetime, *, active_context: AppContext) -> bool:
+        for run in reversed(active_context.state_store.get_run_history()):
             raw_timestamp = run.get("timestamp")
             if not isinstance(raw_timestamp, str):
                 continue
@@ -56,6 +59,11 @@ class DailyScheduler:
             if localized < threshold - timedelta(days=1):
                 break
         return False
+
+    def _current_context(self) -> AppContext:
+        if callable(self.context):
+            return self.context()
+        return self.context
 
 
 def _parse_daily_time(value: str) -> time:
